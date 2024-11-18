@@ -11,6 +11,8 @@ app = FastAPI()
 AZURE_CONNECTION_STRING = "UseDevelopmentStorage=true"  # Azurite default connection string
 TABLE_NAME = "FAQs"
 
+notFoundExceptionMessage = "No FAQ with the details provided was found."
+
 # Initialize TableServiceClient
 table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
@@ -92,6 +94,10 @@ async def get_faqs_by_category(category: Optional[str] = Header(None, descriptio
         
         return faqs
     
+    except HTTPException as http_exception:
+        # If it's already an HTTPException (like a 404), raise it as is
+        raise http_exception
+    
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -109,8 +115,12 @@ async def get_faq_by_id(faq_id: str, category: str):
             category=entity["PartitionKey"]
         )
     
+    except HTTPException as http_exception:
+        # If it's already an HTTPException (like a 404), raise it as is
+        raise http_exception
+    
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FAQ not found.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.put("/faqs/{faq_id}", response_model=FAQEntry)
@@ -139,8 +149,12 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
             category=entity["Category"]
         )
     
+    except HTTPException as http_exception:
+        # If it's already an HTTPException (like a 404), raise it as is
+        raise http_exception
+    
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FAQ not found.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.delete("/faqs/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -153,5 +167,9 @@ async def delete_faq(faq_id: str, category: str):
         table_client.delete_entity(partition_key=category, row_key=faq_id)
         return {"message": "FAQ deleted successfully."}
     
+    except HTTPException as http_exception:
+        # If it's already an HTTPException (like a 404), raise it as is
+        raise http_exception
+    
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FAQ not found." + e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
