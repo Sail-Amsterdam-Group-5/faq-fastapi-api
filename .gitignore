@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#Azurite
+__azurite_db_blob__.json
+__azurite_db_blob_extent__.json
+
 # C extensions
 *.so
 
