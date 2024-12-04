@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
-from main import app, table_client  # assuming your app is in `main.py`
+from app.main import app, table_client  # assuming your app is in `main.py`
 
 client = TestClient(app)
 
