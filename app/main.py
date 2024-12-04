@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Header, status
 from pydantic import BaseModel, Field
 from azure.data.tables import TableServiceClient, TableEntity
-from typing import List, Optional
+from typing import List, Optional, Dict # For testing with mock storage
+from unittest.mock import MagicMock # For testing with mock storage
 import uuid
 
 # Initialize FastAPI app
@@ -14,13 +15,13 @@ TABLE_NAME = "FAQs"
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
 # Initialize TableServiceClient
-table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+# table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
-# Ensure the table exists
-try:
-    table_client = table_service.create_table_if_not_exists(TABLE_NAME)
-except Exception as e:
-    raise RuntimeError(f"Failed to initialize Table Storage: {e}")
+# # Ensure the table exists
+# try:
+#     table_client = table_service.create_table_if_not_exists(TABLE_NAME)
+# except Exception as e:
+#     raise RuntimeError(f"Failed to initialize Table Storage: {e}")
 
 # Define Pydantic models for input validation
 class FAQEntry(BaseModel):
@@ -32,6 +33,44 @@ class FAQUpdate(BaseModel):
     question: Optional[str] = Field(None, min_length=5, max_length=500)
     answer: Optional[str] = Field(None, min_length=1, max_length=1000)
     category: Optional[str] = Field(None, min_length=1, max_length=100)
+
+# Fake table client for openshift testing purposes
+
+# Mock Table Storage
+class MockTableClient:
+    def __init__(self):
+        self.data = []  # Fake in-memory table storage
+
+    def create_table_if_not_exists(self, table_name: str):
+        """Mock table creation."""
+        if table_name != TABLE_NAME:
+            raise ValueError(f"Unknown table: {table_name}")
+        return self  # Return the mock itself to mimic a real client
+
+    def create_entity(self, entity: Dict):
+        """Mock entity insertion/upsertion."""
+        self.data.append(entity)
+
+    def list_entities(self) -> List[Dict]:
+        """Mock retrieval of all entities."""
+        return self.data
+
+    def query_entities(self, filter: str = None) -> List[Dict]:
+        """Mock querying entities."""
+        # For simplicity, just return all FAQs for now
+        return self.data
+    
+    def update_entity(self, entity: Dict):
+        """Mock entity insertion/upsertion."""
+        # Update if RowKey exists
+        for i, existing_entity in enumerate(self.data):
+            if existing_entity["PartitionKey"] == entity["PartitionKey"] and existing_entity["RowKey"] == entity["RowKey"]:
+                self.data[i] = entity  # Update existing entity
+                return
+
+# Inject mock TableClient
+table_service = MockTableClient()
+table_client = table_service.create_table_if_not_exists(TABLE_NAME)
 
 @app.post("/faqs", status_code=201)
 async def create_faq_entry(faq: FAQEntry):
@@ -173,3 +212,17 @@ async def delete_faq(faq_id: str, category: str):
     
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    
+
+
+
+# Testing Endpoint
+@app.get("/mock/data")
+async def mock_data():
+    """Populate mock data for testing."""
+    mock_faqs = [
+        {"PartitionKey": "FAQ", "RowKey": "1", "Question": "What is FastAPI?", "Answer": "A modern Python web framework.", "category": "Framework"},
+        {"PartitionKey": "FAQ", "RowKey": "2", "Question": "What is OpenShift?", "Answer": "A Kubernetes-based platform for containerized apps.", "category": "DevOps"},
+    ]
+    table_client.data.extend(mock_faqs)
+    return {"message": "Mock data added successfully!", "data": mock_faqs}
