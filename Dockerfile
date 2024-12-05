@@ -1,18 +1,16 @@
-# Use a lightweight Python image
-FROM python:3.10-slim
+FROM python:3.9
 
-# Set working directory
-WORKDIR /app
 
-# Copy project files
-COPY ./app /app
-COPY requirements.txt /app/requirements.txt
+WORKDIR .
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the default FastAPI port
-EXPOSE 8000
+COPY ./requirements.txt ./requirements.txt
 
-# Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
+
+
+COPY ./app ./app
+
+
+CMD ["fastapi", "run", "app/main.py", "--port", "80"]
