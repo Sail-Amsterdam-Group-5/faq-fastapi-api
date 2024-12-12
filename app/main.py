@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException, Header, status
 from pydantic import BaseModel, Field
 from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
-from typing import List, Optional, Dict # For testing with mock storage
-from unittest.mock import MagicMock # For testing with mock storage
+from typing import List, Optional, Dict  # For testing with mock storage
+from unittest.mock import MagicMock  # For testing with mock storage
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
 import logging
 import uuid
@@ -13,12 +13,14 @@ app = FastAPI()
 logger = logging.getLogger(__name__)
 
 # Azure Table Storage configuration
-AZURE_CONNECTION_STRING = "UseDevelopmentStorage=true"  # Azurite default connection string
+AZURE_CONNECTION_STRING = (
+    "UseDevelopmentStorage=true"  # Azurite default connection string
+)
 TABLE_NAME = "FAQs"
 
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
-#Initialize TableServiceClient
+# Initialize TableServiceClient
 table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
 # Ensure the table exists
@@ -27,22 +29,32 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to initialize Table Storage: {e}")
 
+
 # Define Pydantic models for input validation
 class FAQEntry(BaseModel):
-    question: str = Field(..., min_length=5, max_length=500, description="The FAQ question")
-    answer: str = Field(..., min_length=1, max_length=1000, description="The FAQ answer")
-    category: str = Field(..., min_length=1, max_length=100, description="Category of the FAQ")
+    question: str = Field(
+        ..., min_length=5, max_length=500, description="The FAQ question"
+    )
+    answer: str = Field(
+        ..., min_length=1, max_length=1000, description="The FAQ answer"
+    )
+    category: str = Field(
+        ..., min_length=1, max_length=100, description="Category of the FAQ"
+    )
     id: Optional[str] = Field(None, min_length=1, max_length=100)
     clicks: Optional[int] = Field(...)
+
 
 class FAQUpdate(BaseModel):
     question: Optional[str] = Field(None, min_length=5, max_length=500)
     answer: Optional[str] = Field(None, min_length=1, max_length=1000)
     category: Optional[str] = Field(None, min_length=1, max_length=100)
 
+
 # FAQ Endpoints:
 
 # POST /faqs: Accepts an FAQEntry and stores it in the database. Returns a success message and the inserted data upon success.
+
 
 @app.post("/faqs", status_code=201)
 async def create_faq_entry(faq: FAQEntry):
@@ -59,7 +71,7 @@ async def create_faq_entry(faq: FAQEntry):
         "RowKey": row_key,
         "Question": faq.question,
         "Answer": faq.answer,
-        "Clicks": 0
+        "Clicks": 0,
     }
 
     try:
@@ -80,10 +92,14 @@ async def create_faq_entry(faq: FAQEntry):
         logger.error(f"Error creating FAQ: {e}")
         raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
+
 # GET /faqs: Accepts a category to query by and returns all of the results. If no category is provided or it is null it returns all FAQs stored in the database.
 
+
 @app.get("/faqs", response_model=List[FAQEntry])
-async def get_faqs_by_category(category: Optional[str] = Header(None, description="Category of the FAQs")):
+async def get_faqs_by_category(
+    category: Optional[str] = Header(None, description="Category of the FAQs"),
+):
     """
     Get all FAQs filtered by category passed in the header, sorted by the 'Clicks' column.
     """
@@ -104,7 +120,7 @@ async def get_faqs_by_category(category: Optional[str] = Header(None, descriptio
                 answer=entity["Answer"],
                 category=entity["PartitionKey"],
                 id=entity["RowKey"],
-                clicks=entity["Clicks"]
+                clicks=entity["Clicks"],
             )
             for entity in entities
         ]
@@ -112,7 +128,9 @@ async def get_faqs_by_category(category: Optional[str] = Header(None, descriptio
         faqs.sort(key=lambda faq: faq.clicks, reverse=True)
 
         if not faqs:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No FAQs found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="No FAQs found."
+            )
 
         return faqs
 
@@ -121,10 +139,13 @@ async def get_faqs_by_category(category: Optional[str] = Header(None, descriptio
         raise http_exception
 
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
 
 
 # GET /faqs/{faq_id}: Gets an FAQ based on the partition key (category) and row key (faq_id).
+
 
 @app.get("/faqs/{category}/{faq_id}", response_model=FAQEntry)
 async def get_faq_by_id(faq_id: str, category: str):
@@ -133,55 +154,91 @@ async def get_faq_by_id(faq_id: str, category: str):
     """
     try:
         entity = table_client.get_entity(partition_key=category, row_key=faq_id)
-        
+
         return FAQEntry(
             question=entity["Question"],
             answer=entity["Answer"],
-            category=entity["PartitionKey"]
+            category=entity["PartitionKey"],
         )
-    
+
     except HTTPException as http_exception:
         # If it's already an HTTPException (like a 404), raise it as is
         raise http_exception
-    
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-    
 
-@app.put("/faqs/{faq_id}", response_model=FAQEntry)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+# PUT /faqs/{category}/{faq_id}: If the FAQUpdate object in the request contains a non-null category (i.e. the user wants to update the Partition Key of an existing FAQ) copy the entry data, delete the entry and insert a new entry with the same data and an altered Partition Key. Otherwise, simply update the columns specified by the user.
+
+@app.put("/faqs/{category}/{faq_id}", response_model=FAQEntry)
 async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
     """
     Update an existing FAQ by PartitionKey (category) and RowKey (faq_id).
+    If the category is updated, copy the entity to a new PartitionKey, delete the old entry, and insert the new one.
     """
     try:
         # Fetch the existing FAQ entity
         entity = table_client.get_entity(partition_key=category, row_key=faq_id)
-        
-        # Only update non-None fields
-        if faq.question:
-            entity["Question"] = faq.question
-        if faq.answer:
-            entity["Answer"] = faq.answer
-        if faq.category:
-            entity["Category"] = faq.category  # You can also choose to not change category
-        
-        # Update the entity in Table Storage
-        table_client.update_entity(entity=entity)
-        
-        return FAQEntry(
-            question=entity["Question"],
-            answer=entity["Answer"],
-            category=entity["Category"]
-        )
-    
+
+        # Handle category update
+        if faq.category and faq.category != category:
+            # Copy the existing entity to a new PartitionKey
+            new_entity = entity.copy()
+            new_entity["PartitionKey"] = faq.category  # Update category (PartitionKey)
+            new_entity["RowKey"] = faq_id
+
+            # Update fields if specified
+            if faq.question:
+                new_entity["Question"] = faq.question
+            if faq.answer:
+                new_entity["Answer"] = faq.answer
+
+            # Insert new entity and delete the old one
+            table_client.create_entity(entity=new_entity)
+            table_client.delete_entity(partition_key=category, row_key=faq_id)
+
+            # Return the new entity
+            return FAQEntry(
+                question=new_entity["Question"],
+                answer=new_entity["Answer"],
+                category=new_entity["PartitionKey"],
+                id=new_entity["RowKey"],
+                clicks=new_entity.get("Clicks", 0)  # Include clicks, default to 0 if missing
+            )
+
+        else:
+            # Only update specified fields for the existing entity
+            if faq.question:
+                entity["Question"] = faq.question
+            if faq.answer:
+                entity["Answer"] = faq.answer
+
+            # Update the entity in Table Storage
+            table_client.update_entity(entity=entity)
+
+            # Return the updated entity
+            return FAQEntry(
+                question=entity["Question"],
+                answer=entity["Answer"],
+                category=entity["PartitionKey"],
+                id=entity["RowKey"],
+                clicks=entity.get("Clicks", 0)  # Include clicks, default to 0 if missing
+            )
+
     except HTTPException as http_exception:
         # If it's already an HTTPException (like a 404), raise it as is
         raise http_exception
-    
+
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
 
 # DELETE /faqs/{faq_id}: Deletes an entry in the database with the faq_id specified
+
 
 @app.delete("/faqs/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(faq_id: str, category: str):
@@ -192,15 +249,19 @@ async def delete_faq(faq_id: str, category: str):
         # Delete the FAQ entity
         table_client.delete_entity(partition_key=category, row_key=faq_id)
         return {"message": "FAQ deleted successfully."}
-    
+
     except HTTPException as http_exception:
         # If it's already an HTTPException (like a 404), raise it as is
         raise http_exception
-    
+
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-    
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+
 # POST /faqs/{category}/{faq_id}: Increments the Clicks column of the row with the specified Partition and RowKey (category and faq_id respectively) by 1 when called.
+
 
 @app.post("/faqs/{category}/{faq_id}/click")
 async def increment_clicks(category: str, faq_id: str):
@@ -214,15 +275,17 @@ async def increment_clicks(category: str, faq_id: str):
         # Increment the Clicks value
         current_clicks = entity["Clicks"]  # Default to 0 if Clicks is not set
         entity["Clicks"] = current_clicks + 1
-        
+
         # Update the entity back into the table
         table_client.update_entity(entity, mode=UpdateMode.REPLACE)
 
         # Log or return data properly, ensuring integers are converted to strings
         return {
             "detail": "Clicks incremented successfully.",
-            "new_clicks": entity["Clicks"]  # No concatenation here
+            "new_clicks": entity["Clicks"],  # No concatenation here
         }
 
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
