@@ -3,10 +3,14 @@ from pydantic import BaseModel, Field
 from azure.data.tables import TableServiceClient, TableEntity
 from typing import List, Optional, Dict # For testing with mock storage
 from unittest.mock import MagicMock # For testing with mock storage
+from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
+import logging
 import uuid
 
 # Initialize FastAPI app
 app = FastAPI()
+
+logger = logging.getLogger(__name__)
 
 # Azure Table Storage configuration
 AZURE_CONNECTION_STRING = "UseDevelopmentStorage=true"  # Azurite default connection string
@@ -72,6 +76,10 @@ class MockTableClient:
 table_service = MockTableClient()
 table_client = table_service.create_table_if_not_exists(TABLE_NAME)
 
+# FAQ Endpoints:
+
+# POST /faqs: Accepts an FAQEntry and stores it in the database. Returns a success message and the inserted data upon success.
+
 @app.post("/faqs", status_code=201)
 async def create_faq_entry(faq: FAQEntry):
     """
@@ -101,8 +109,13 @@ async def create_faq_entry(faq: FAQEntry):
                 "category": faq.category,
             },
         }
+    except ResourceExistsError:
+        raise HTTPException(status_code=409, detail="FAQ entry already exists.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create FAQ entry: {str(e)}")
+        logger.error(f"Error creating FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred.")
+
+# GET /faqs: Accepts a category to query by and returns all of the results. If no category is provided or it is null it returns all FAQs stored in the database.
 
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(category: Optional[str] = Header(None, description="Category of the FAQs")):
@@ -140,7 +153,9 @@ async def get_faqs_by_category(category: Optional[str] = Header(None, descriptio
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@app.get("/faqs/{faq_id}", response_model=FAQEntry)
+# GET /faqs/{faq_id}: Gets an FAQ based on the partition key (category) and row key (faq_id).
+
+@app.get("/faqs/{category}/{faq_id}", response_model=FAQEntry)
 async def get_faq_by_id(faq_id: str, category: str):
     """
     Get a FAQ by PartitionKey (category) and RowKey (faq_id).
@@ -160,7 +175,7 @@ async def get_faq_by_id(faq_id: str, category: str):
     
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
+    
 
 @app.put("/faqs/{faq_id}", response_model=FAQEntry)
 async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
@@ -195,6 +210,7 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+# DELETE /faqs/{faq_id}: Deletes an entry in the database with the faq_id specified
 
 @app.delete("/faqs/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(faq_id: str, category: str):
