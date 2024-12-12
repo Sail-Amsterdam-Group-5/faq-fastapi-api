@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header, status
 from pydantic import BaseModel, Field
-from azure.data.tables import TableServiceClient, TableEntity
+from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
 from typing import List, Optional, Dict # For testing with mock storage
 from unittest.mock import MagicMock # For testing with mock storage
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
@@ -197,5 +197,32 @@ async def delete_faq(faq_id: str, category: str):
         # If it's already an HTTPException (like a 404), raise it as is
         raise http_exception
     
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    
+# POST /faqs/{category}/{faq_id}: Increments the Clicks column of the row with the specified Partition and RowKey (category and faq_id respectively) by 1 when called.
+
+@app.post("/faqs/{category}/{faq_id}/click")
+async def increment_clicks(category: str, faq_id: str):
+    """
+    Increment the Clicks column for a FAQ by PartitionKey (category) and RowKey (faq_id).
+    """
+    try:
+        # Fetch the entity to get the current Clicks value
+        entity = table_client.get_entity(partition_key=category, row_key=faq_id)
+
+        # Increment the Clicks value
+        current_clicks = entity["Clicks"]  # Default to 0 if Clicks is not set
+        entity["Clicks"] = current_clicks + 1
+        
+        # Update the entity back into the table
+        table_client.update_entity(entity, mode=UpdateMode.REPLACE)
+
+        # Log or return data properly, ensuring integers are converted to strings
+        return {
+            "detail": "Clicks incremented successfully.",
+            "new_clicks": entity["Clicks"]  # No concatenation here
+        }
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
