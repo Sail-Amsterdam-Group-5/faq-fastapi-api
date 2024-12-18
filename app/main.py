@@ -7,6 +7,18 @@ from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
 import logging
 import uuid
 
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+
+KEY_VAULT_URL = "https://sailfaqdatabasedevcred.vault.azure.net/"
+
+credential = DefaultAzureCredential()
+
+# Get secret from Azure Key Vault
+secret_name = "sail-faq-dev-database-conn"
+secret_client = SecretClient(vault_url=KEY_VAULT_URL, credential=credential)
+retrieved_secret = secret_client.get_secret(secret_name)
+
 # Initialize FastAPI app
 app = FastAPI()
 
@@ -14,9 +26,11 @@ logger = logging.getLogger(__name__)
 
 # Azure Table Storage configuration
 AZURE_CONNECTION_STRING = (
-    "UseDevelopmentStorage=true"  # Azurite default connection string
+    f"{retrieved_secret.value}"  # Azure conn string
 )
-TABLE_NAME = "FAQs"
+TABLE_NAME = "faqs"
+
+# print(AZURE_CONNECTION_STRING)
 
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
@@ -42,7 +56,7 @@ class FAQEntry(BaseModel):
         ..., min_length=1, max_length=100, description="Category of the FAQ"
     )
     id: Optional[str] = Field(None, min_length=1, max_length=100)
-    clicks: Optional[int] = Field(...)
+    clicks: Optional[int] = Field(None)
 
 
 class FAQUpdate(BaseModel):
@@ -53,8 +67,8 @@ class FAQUpdate(BaseModel):
 
 # FAQ Endpoints:
 
-# POST /faqs: Accepts an FAQEntry and stores it in the database. Returns a success message and the inserted data upon success.
 
+# POST /faqs: Accepts an FAQEntry and stores it in the database. Returns a success message and the inserted data upon success.
 
 @app.post("/faqs", status_code=201)
 async def create_faq_entry(faq: FAQEntry):
@@ -94,7 +108,6 @@ async def create_faq_entry(faq: FAQEntry):
 
 
 # GET /faqs: Accepts a category to query by and returns all of the results. If no category is provided or it is null it returns all FAQs stored in the database.
-
 
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(
@@ -146,7 +159,6 @@ async def get_faqs_by_category(
 
 # GET /faqs/{faq_id}: Gets an FAQ based on the partition key (category) and row key (faq_id).
 
-
 @app.get("/faqs/{category}/{faq_id}", response_model=FAQEntry)
 async def get_faq_by_id(faq_id: str, category: str):
     """
@@ -169,6 +181,7 @@ async def get_faq_by_id(faq_id: str, category: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 # PUT /faqs/{category}/{faq_id}: If the FAQUpdate object in the request contains a non-null category (i.e. the user wants to update the Partition Key of an existing FAQ) copy the entry data, delete the entry and insert a new entry with the same data and an altered Partition Key. Otherwise, simply update the columns specified by the user.
 
@@ -239,8 +252,7 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
 
 # DELETE /faqs/{faq_id}: Deletes an entry in the database with the faq_id specified
 
-
-@app.delete("/faqs/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/faqs/{category}/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(faq_id: str, category: str):
     """
     Delete an FAQ by PartitionKey (category) and RowKey (faq_id).
@@ -261,7 +273,6 @@ async def delete_faq(faq_id: str, category: str):
 
 
 # POST /faqs/{category}/{faq_id}: Increments the Clicks column of the row with the specified Partition and RowKey (category and faq_id respectively) by 1 when called.
-
 
 @app.post("/faqs/{category}/{faq_id}/click")
 async def increment_clicks(category: str, faq_id: str):
