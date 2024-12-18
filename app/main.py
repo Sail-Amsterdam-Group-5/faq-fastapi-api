@@ -10,6 +10,8 @@ import uuid
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 
+logging.basicConfig(level=logging.ERROR)
+
 KEY_VAULT_URL = "https://sailfaqdatabasedevcred.vault.azure.net/"
 
 credential = DefaultAzureCredential()
@@ -24,13 +26,17 @@ app = FastAPI()
 
 logger = logging.getLogger(__name__)
 
-# Azure Table Storage configuration
-AZURE_CONNECTION_STRING = (
-    f"{retrieved_secret.value}"  # Azure conn string
-)
-TABLE_NAME = "faqs"
+class SensitiveDataFilter(logging.Filter):
+    def filter(self, record):
+        if "retrieved_secret.value" in record.getMessage():
+            record.msg = record.msg.replace(retrieved_secret.value, "[REDACTED]")
+        return True
 
-# print(AZURE_CONNECTION_STRING)
+logger.addFilter(SensitiveDataFilter())
+
+# Azure Table Storage configuration
+AZURE_CONNECTION_STRING = f"{retrieved_secret.value}"  # Azure conn string
+TABLE_NAME = "faqs"
 
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
@@ -41,7 +47,10 @@ table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRIN
 try:
     table_client = table_service.create_table_if_not_exists(TABLE_NAME)
 except Exception as e:
-    raise RuntimeError(f"Failed to initialize Table Storage: {e}")
+    logger.error("Failed to initialize Table Storage: %s", str(e))
+    raise RuntimeError(
+        "Failed to initialize Table Storage. Please check the logs for details."
+    )
 
 
 # Define Pydantic models for input validation
@@ -69,6 +78,7 @@ class FAQUpdate(BaseModel):
 
 
 # POST /faqs: Accepts an FAQEntry and stores it in the database. Returns a success message and the inserted data upon success.
+
 
 @app.post("/faqs", status_code=201)
 async def create_faq_entry(faq: FAQEntry):
@@ -103,11 +113,12 @@ async def create_faq_entry(faq: FAQEntry):
     except ResourceExistsError:
         raise HTTPException(status_code=409, detail="FAQ entry already exists.")
     except Exception as e:
-        logger.error(f"Error creating FAQ: {e}")
+        logger.error("Failed to create FAQ entry", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
 
 # GET /faqs: Accepts a category to query by and returns all of the results. If no category is provided or it is null it returns all FAQs stored in the database.
+
 
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(
@@ -159,6 +170,7 @@ async def get_faqs_by_category(
 
 # GET /faqs/{faq_id}: Gets an FAQ based on the partition key (category) and row key (faq_id).
 
+
 @app.get("/faqs/{category}/{faq_id}", response_model=FAQEntry)
 async def get_faq_by_id(faq_id: str, category: str):
     """
@@ -173,17 +185,16 @@ async def get_faq_by_id(faq_id: str, category: str):
             category=entity["PartitionKey"],
         )
 
-    except HTTPException as http_exception:
-        # If it's already an HTTPException (like a 404), raise it as is
-        raise http_exception
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+    except ResourceNotFoundError:
+        raise HTTPException(status_code=404, detail="FAQ not found.")
+    
+    except Exception:
+        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
 
 # PUT /faqs/{category}/{faq_id}: If the FAQUpdate object in the request contains a non-null category (i.e. the user wants to update the Partition Key of an existing FAQ) copy the entry data, delete the entry and insert a new entry with the same data and an altered Partition Key. Otherwise, simply update the columns specified by the user.
+
 
 @app.put("/faqs/{category}/{faq_id}", response_model=FAQEntry)
 async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
@@ -218,7 +229,9 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
                 answer=new_entity["Answer"],
                 category=new_entity["PartitionKey"],
                 id=new_entity["RowKey"],
-                clicks=new_entity.get("Clicks", 0)  # Include clicks, default to 0 if missing
+                clicks=new_entity.get(
+                    "Clicks", 0
+                ),  # Include clicks, default to 0 if missing
             )
 
         else:
@@ -237,20 +250,21 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
                 answer=entity["Answer"],
                 category=entity["PartitionKey"],
                 id=entity["RowKey"],
-                clicks=entity.get("Clicks", 0)  # Include clicks, default to 0 if missing
+                clicks=entity.get(
+                    "Clicks", 0
+                ),  # Include clicks, default to 0 if missing
             )
 
-    except HTTPException as http_exception:
-        # If it's already an HTTPException (like a 404), raise it as is
-        raise http_exception
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+    except ResourceNotFoundError:
+        raise HTTPException(status_code=404, detail="FAQ not found.")
+    
+    except Exception:
+        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
 
 # DELETE /faqs/{faq_id}: Deletes an entry in the database with the faq_id specified
+
 
 @app.delete("/faqs/{category}/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(faq_id: str, category: str):
@@ -262,17 +276,16 @@ async def delete_faq(faq_id: str, category: str):
         table_client.delete_entity(partition_key=category, row_key=faq_id)
         return {"message": "FAQ deleted successfully."}
 
-    except HTTPException as http_exception:
-        # If it's already an HTTPException (like a 404), raise it as is
-        raise http_exception
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+    except ResourceNotFoundError:
+        raise HTTPException(status_code=404, detail="FAQ not found.")
+    
+    except Exception:
+        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
 
 # POST /faqs/{category}/{faq_id}: Increments the Clicks column of the row with the specified Partition and RowKey (category and faq_id respectively) by 1 when called.
+
 
 @app.post("/faqs/{category}/{faq_id}/click")
 async def increment_clicks(category: str, faq_id: str):
@@ -296,7 +309,9 @@ async def increment_clicks(category: str, faq_id: str):
             "new_clicks": entity["Clicks"],  # No concatenation here
         }
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+    except ResourceNotFoundError:
+        raise HTTPException(status_code=404, detail="FAQ not found.")
+    
+    except Exception:
+        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error occurred.")
