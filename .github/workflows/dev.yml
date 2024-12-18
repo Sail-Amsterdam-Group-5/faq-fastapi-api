@@ -40,7 +40,7 @@ jobs:
 
       # Step 3.5: Change Flake 8 max. char. lenght
       - name: Change default max. char. length.
-        run: flake8 --max-line-length=120
+        run: flake8 . --max-line-length=120
 
       # Step 4: Run Linting (Flake8)
       - name: Run Flake8 for linting
