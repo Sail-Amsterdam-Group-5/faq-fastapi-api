@@ -153,3 +153,5 @@ def test_update_faq():
     faq = response.json()
     assert faq["question"] == "Updated Question"
     assert faq["category"] == "General"
+
+    # Test
