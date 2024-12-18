@@ -44,7 +44,6 @@ PyJWT==2.10.1
 pytest==8.3.3
 python-dotenv==1.0.1
 python-multipart==0.0.17
-pywin32==308
 PyYAML==6.0.2
 requests==2.32.3
 rich==13.9.4
