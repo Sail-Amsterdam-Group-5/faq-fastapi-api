@@ -331,3 +331,5 @@ async def increment_clicks(category: str, faq_id: str):
     except Exception:
         logger.error(failedToFetchFaqErrorMsg, exc_info=True)
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
+
+# Test
