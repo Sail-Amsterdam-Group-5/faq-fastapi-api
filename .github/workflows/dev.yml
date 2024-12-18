@@ -95,7 +95,7 @@ jobs:
         # Step 5: Build and Push Docker Image
         - name: Build and push Docker image
           run: |
-            docker build -t earlybirdreal/sail-map-api:latest .
+            docker build -t earlybirdreal/sail-faq-api:latest .
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login --username ${{ secrets.DOCKER_ID }} --password-stdin
             docker push earlybirdreal/sail-faq-api:latest
 
