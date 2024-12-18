@@ -27,6 +27,8 @@ app = FastAPI()
 logger = logging.getLogger(__name__)
 
 internalServerErrorMsg = "Internal server error occurred."
+faqNotFoundErrorMsg = "FAQ not found."
+failedToFetchFaqErrorMsg = "Failed to fetch FAQ entry"
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -82,7 +84,7 @@ class FAQUpdate(BaseModel):
 # FAQ Endpoints:
 
 
-# POST /faqs: Accepts an FAQEntry and stores it in the database. 
+# POST /faqs: Accepts an FAQEntry and stores it in the database.
 # Returns a success message and the inserted data upon success.
 
 
@@ -123,7 +125,7 @@ async def create_faq_entry(faq: FAQEntry):
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
 
 
-# GET /faqs: Accepts a category to query by and returns all of the results. 
+# GET /faqs: Accepts a category to query by and returns all of the results.
 # If no category is provided or it is null it returns all FAQs in the db.
 
 
@@ -132,7 +134,7 @@ async def get_faqs_by_category(
     category: Optional[str] = Header(None, description="Category of the FAQs"),
 ):
     """
-    Get all FAQs filtered by category passed in the header, 
+    Get all FAQs filtered by category passed in the header,
     sorted by the 'Clicks' column.
     """
     try:
@@ -175,7 +177,7 @@ async def get_faqs_by_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
- 
+
 # Gets an FAQ based on the PartitionKey (category) and RowKey (faq_id).
 
 
@@ -195,17 +197,17 @@ async def get_faq_by_id(faq_id: str, category: str):
         )
 
     except ResourceNotFoundError:
-        raise HTTPException(status_code=404, detail="FAQ not found.")
+        raise HTTPException(status_code=404, detail=faqNotFoundErrorMsg)
 
     except Exception:
-        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        logger.error(failedToFetchFaqErrorMsg, exc_info=True)
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
 
 
-# PUT: If the FAQUpdate object in the request contains a non-null category 
+# PUT: If the FAQUpdate object in the request contains a non-null category
 # (i.e. the user wants to update the Partition Key of an existing FAQ)
-# copy the entry data, delete the entry and insert a new entry 
-# with the same data and an altered Partition Key. 
+# copy the entry data, delete the entry and insert a new entry
+# with the same data and an altered Partition Key.
 # Otherwise, simply update the columns specified by the user.
 
 
@@ -213,13 +215,13 @@ async def get_faq_by_id(faq_id: str, category: str):
 async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
     """
     Update an existing FAQ by PartitionKey (category) and RowKey (faq_id).
-    If the category is updated, copy the entity to a new PartitionKey, 
+    If the category is updated, copy the entity to a new PartitionKey,
     delete the old entry, and insert the new one.
     """
     try:
         # Fetch the existing FAQ entity
         entity = table_client.get_entity(
-            partition_key=category, 
+            partition_key=category,
             row_key=faq_id)
 
         # Handle category update
@@ -272,17 +274,17 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
             )
 
     except ResourceNotFoundError:
-        raise HTTPException(status_code=404, detail="FAQ not found.")
+        raise HTTPException(status_code=404, detail=faqNotFoundErrorMsg)
 
     except Exception:
-        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        logger.error(failedToFetchFaqErrorMsg, exc_info=True)
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
 
 
 # DELETE: Deletes an entry in the database with the faq_id specified
 
 
-@app.delete("/faqs/{category}/{faq_id}", 
+@app.delete("/faqs/{category}/{faq_id}",
             status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(faq_id: str, category: str):
     """
@@ -294,27 +296,27 @@ async def delete_faq(faq_id: str, category: str):
         return {"message": "FAQ deleted successfully."}
 
     except ResourceNotFoundError:
-        raise HTTPException(status_code=404, detail="FAQ not found.")
+        raise HTTPException(status_code=404, detail=faqNotFoundErrorMsg)
 
     except Exception:
-        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        logger.error(failedToFetchFaqErrorMsg, exc_info=True)
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
 
 
-# POST: Increments the Clicks column of the row with the specified Partition 
+# POST: Increments the Clicks column of the row with the specified Partition
 # and RowKey (category and faq_id respectively) by 1 when called.
 
 
 @app.post("/faqs/{category}/{faq_id}/click")
 async def increment_clicks(category: str, faq_id: str):
     """
-    Increment the Clicks column for an FAQ 
+    Increment the Clicks column for an FAQ
     by PartitionKey (category) and RowKey (faq_id).
     """
     try:
         # Fetch the entity to get the current Clicks value
         entity = table_client.get_entity(
-            partition_key=category, 
+            partition_key=category,
             row_key=faq_id)
 
         # Increment the Clicks value
@@ -331,8 +333,8 @@ async def increment_clicks(category: str, faq_id: str):
         }
 
     except ResourceNotFoundError:
-        raise HTTPException(status_code=404, detail="FAQ not found.")
+        raise HTTPException(status_code=404, detail=faqNotFoundErrorMsg)
 
     except Exception:
-        logger.error("Failed to fetch FAQ entry", exc_info=True)
+        logger.error(failedToFetchFaqErrorMsg, exc_info=True)
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
