@@ -1,0 +1,104 @@
+name: QA CI
+
+on:
+  push:
+    branches:
+      - qa
+    paths:
+      - '**.ts'
+      - 'deployment.yml'
+  pull_request:
+    branches:
+      - qa
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 20.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: npm
+      - run: npm install
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 20.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: npm
+      - run: npm install
+      - run: npm run test
+
+  # add Integration test
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 20.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: npm
+      - run: npm install
+      - run: npm run test:2e2
+
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    needs: [linting, test, e2e-test]
+    if: |
+      (needs.linting.result == 'success') && (needs.test.result == 'success') && (needs.e2e-test.result == 'success')
+
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up OpenShift CLI
+      - name: Install OpenShift CLI
+        run: |
+          curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xz -C /usr/local/bin
+          oc version
+
+      # Step 3: Log in to OpenShift
+      - name: Log in to OpenShift
+        run: |
+          oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=${{ secrets.OPENSHIFT_SERVER }}
+
+      # Step 4: Switch to the target namespace/project
+      - name: Switch namespace
+        run: |
+          oc project oscar-dev
+
+      # Step 5: Build and Push Docker Image
+      - name: Build and push Docker image
+        run: |
+          docker build -t earlybirdreal/sail-map-api:latest .
+          echo "${{ secrets.DOCKER_TOKEN }}" | docker login --username ${{ secrets.DOCKER_ID }} --password-stdin
+          docker push earlybirdreal/sail-map-api:latest
+
+      # Step 6: Deploy to OpenShift
+      - name: Apply deployment configuration
+        run: |
+          oc apply -f openshift/deployment.yml
+
+  # Add Load test
+
+  # Do not forget to add the following secrets to your repository:
+    # - OPENSHIFT_TOKEN = <your_open_shift_token>
+    # - OPENSHIFT_SERVER = <your_open_shift_server>
+    # - DOCKER_ID = <your_docker_hub_id>
+    # - DOCKER_TOKEN = <your_docker_hub_token>

@@ -22,6 +22,7 @@ secret_client = SecretClient(vault_url=KEY_VAULT_URL, credential=credential)
 retrieved_secret = secret_client.get_secret(secret_name)
 
 # Initialize FastAPI app
+# added a comment to check the workings of workflows v4.0
 app = FastAPI()
 
 logger = logging.getLogger(__name__)
