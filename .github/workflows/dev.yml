@@ -72,8 +72,6 @@ jobs:
       runs-on: ubuntu-latest
 
       needs: [linting, test]
-      if: |
-        (needs.linting.result == 'success') && (needs.test.result == 'success')
 
       steps:
         # Step 1: Check out the code
