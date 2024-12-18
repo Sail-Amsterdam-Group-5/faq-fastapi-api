@@ -48,7 +48,7 @@ table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRIN
 try:
     table_client = table_service.create_table_if_not_exists(TABLE_NAME)
 except Exception as e:
-    logger.error("Failed to initialize Table Storage: %s", str(e))
+    logger.error("Failed to initialize Table Storage. Please try again in a moment.")
     raise RuntimeError(
         "Failed to initialize Table Storage. Please check the logs for details."
     )
