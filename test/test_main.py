@@ -13,7 +13,7 @@ mock_faqs = [
         "Category": "General",
         "PartitionKey": "General",
         "RowKey": "1",
-        "Clicks": 10
+        "Clicks": 10,
     },
     {
         "Question": "How do I install FastAPI?",
@@ -21,7 +21,7 @@ mock_faqs = [
         "Category": "Installation",
         "PartitionKey": "Installation",
         "RowKey": "2",
-        "Clicks": 5
+        "Clicks": 5,
     },
 ]
 
@@ -54,9 +54,9 @@ def test_get_all_faqs():
 
 # Test GET /faqs with category header (should return filtered FAQs)
 def test_get_faqs_by_category():
-    response = client.get("/faqs",
-                          headers={"accept": "application/json",
-                                   "category": "General"})
+    response = client.get(
+        "/faqs", headers={"accept": "application/json", "category": "General"}
+    )
 
     assert response.status_code == 200
     faqs = response.json()
@@ -67,9 +67,9 @@ def test_get_faqs_by_category():
 
 # Test GET /faqs with a non-existing category (should return 404)
 def test_get_faqs_by_non_existing_category():
-    response = client.get("/faqs",
-                          headers={"accept": "application/json",
-                                   "category": "NonExistent"})
+    response = client.get(
+        "/faqs", headers={"accept": "application/json", "category": "NonExistent"}
+    )
 
     assert response.status_code == 404
     assert response.json() == {"detail": "No FAQs found."}
@@ -78,7 +78,8 @@ def test_get_faqs_by_non_existing_category():
 # Test GET /faqs with simulated internal server error
 def test_get_faqs_internal_error():
     table_client.query_entities = MagicMock(
-        side_effect=Exception("Database connection error"))
+        side_effect=Exception("Database connection error")
+    )
 
     response = client.get("/faqs", headers={"accept": "application/json"})
 
@@ -90,8 +91,7 @@ def test_get_faqs_internal_error():
 def test_get_faq_by_id():
     table_client.get_entity = MagicMock(return_value=mock_faqs[0])
 
-    response = client.get("/faqs/General/1",
-                          headers={"accept": "application/json"})
+    response = client.get("/faqs/General/1", headers={"accept": "application/json"})
 
     assert response.status_code == 200
     faq = response.json()
@@ -103,8 +103,7 @@ def test_get_faq_by_id():
 def test_get_faq_by_non_existing_id():
     table_client.get_entity = MagicMock(side_effect=ResourceNotFoundError)
 
-    response = client.get("/faqs/General/99",
-                          headers={"accept": "application/json"})
+    response = client.get("/faqs/General/99", headers={"accept": "application/json"})
 
     assert response.status_code == 404
     assert response.json() == {"detail": "FAQ not found."}
@@ -117,20 +116,22 @@ def test_increment_clicks():
     table_client.get_entity = MagicMock(return_value=mock_faqs[0])
     table_client.update_entity = MagicMock()
 
-    response = client.post("/faqs/General/1/click",
-                           headers={"accept": "application/json"})
+    response = client.post(
+        "/faqs/General/1/click", headers={"accept": "application/json"}
+    )
 
     assert response.status_code == 200
-    assert response.json() == {"detail": "Clicks incremented successfully.",
-                               "new_clicks": 11}
+    assert response.json() == {
+        "detail": "Clicks incremented successfully.",
+        "new_clicks": 11,
+    }
 
 
 # Test DELETE /faqs/{category}/{faq_id}
 def test_delete_faq():
     table_client.delete_entity = MagicMock()
 
-    response = client.delete("/faqs/General/1",
-                             headers={"accept": "application/json"})
+    response = client.delete("/faqs/General/1", headers={"accept": "application/json"})
 
     assert response.status_code == 204
 
@@ -145,7 +146,7 @@ def test_update_faq():
     response = client.put(
         "/faqs/General/1",
         headers={"accept": "application/json"},
-        json={"question": "Updated Question"}
+        json={"question": "Updated Question"},
     )
 
     assert response.status_code == 200

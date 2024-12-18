@@ -53,8 +53,7 @@ table_service = TableServiceClient.from_connection_string(AZURE_CONN_STRING)
 try:
     table_client = table_service.create_table_if_not_exists(TABLE_NAME)
 except Exception:
-    logger.error(
-        "Failed to initialize Table Storage. Please try again in a moment.")
+    logger.error("Failed to initialize Table Storage.")
     raise RuntimeError(
         "Failed to initialize Table Storage. Please check the log for details."
     )
@@ -187,8 +186,7 @@ async def get_faq_by_id(faq_id: str, category: str):
     Get a FAQ by PartitionKey (category) and RowKey (faq_id).
     """
     try:
-        entity = table_client.get_entity(
-            partition_key=category, row_key=faq_id)
+        entity = table_client.get_entity(partition_key=category, row_key=faq_id)
 
         return FAQEntry(
             question=entity["Question"],
@@ -220,9 +218,7 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
     """
     try:
         # Fetch the existing FAQ entity
-        entity = table_client.get_entity(
-            partition_key=category,
-            row_key=faq_id)
+        entity = table_client.get_entity(partition_key=category, row_key=faq_id)
 
         # Handle category update
         if faq.category and faq.category != category:
@@ -284,8 +280,7 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
 # DELETE: Deletes an entry in the database with the faq_id specified
 
 
-@app.delete("/faqs/{category}/{faq_id}",
-            status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/faqs/{category}/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(faq_id: str, category: str):
     """
     Delete an FAQ by PartitionKey (category) and RowKey (faq_id).
@@ -315,9 +310,7 @@ async def increment_clicks(category: str, faq_id: str):
     """
     try:
         # Fetch the entity to get the current Clicks value
-        entity = table_client.get_entity(
-            partition_key=category,
-            row_key=faq_id)
+        entity = table_client.get_entity(partition_key=category, row_key=faq_id)
 
         # Increment the Clicks value
         current_clicks = entity["Clicks"]  # Default to 0 if Clicks is not set
