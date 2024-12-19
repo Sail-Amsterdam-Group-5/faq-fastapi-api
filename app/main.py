@@ -23,7 +23,8 @@ TABLE_NAME = "FAQs"
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
 # Initialize TableServiceClient
-# table_service = TableServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+# table_service = TableServiceClient.
+# from_connection_string(AZURE_CONNECTION_STRING)
 
 # # Ensure the table exists
 # try:
@@ -97,7 +98,8 @@ table_client = table_service.create_table_if_not_exists(TABLE_NAME)
 
 # FAQ Endpoints:
 
-# POST /faqs: Accepts an FAQEntry and stores it in the database. Returns a success message and the inserted data upon success.
+# POST /faqs: Accepts an FAQEntry and stores it in the database.
+# Returns a success message and the inserted data upon success.
 
 
 @app.post("/faqs", status_code=201)
@@ -136,7 +138,8 @@ async def create_faq_entry(faq: FAQEntry):
         raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
 
-# GET /faqs: Accepts a category to query by and returns all of the results. If no category is provided or it is null it returns all FAQs stored in the database.
+# GET /faqs: Accepts a category to query by and returns all of the results.
+# If no category is provided or it is null it returns all FAQs stored in the database.
 
 
 @app.get("/faqs", response_model=List[FAQEntry])
