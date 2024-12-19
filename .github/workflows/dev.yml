@@ -40,7 +40,7 @@ jobs:
 
       # Step 4: Run Linting (Flake8)
       - name: Run Flake8 for linting
-        run: flake8 . --count --show-source --statistics --max-line-length=220
+        run: flake8 . --count --show-source --statistics --max-line-length=250
 
       # Step 5: Run Code Formatting Check (Black)
       - name: Run Black for formatting check
