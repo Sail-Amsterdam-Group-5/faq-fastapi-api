@@ -80,6 +80,13 @@ class MockTableClient:
         # For simplicity, just return all FAQs for now
         return self.data
 
+    def get_entity(self, partition_key: str, row_key: str) -> Dict:
+        """Mock entity retrieval."""
+        for entity in self.data:
+            if entity["PartitionKey"] == partition_key and entity["RowKey"] == row_key:
+                return entity
+        raise ResourceExistsError(notFoundExceptionMessage)
+
     def update_entity(self, entity: Dict):
         """Mock entity insertion/upsertion."""
         # Update if RowKey exists
@@ -150,14 +157,7 @@ async def get_faqs_by_category(
     Get all FAQs filtered by category passed in the header.
     """
     try:
-        if category is not None:
-            # Fetch all entries for the specified category
-            query_filter = f"PartitionKey eq '{category}'"
-        else:
-            # If no category is provided, query all entities without filtering by category
-            query_filter = ""
-
-        entities = table_client.query_entities(query_filter)
+        entities = table_client.query_entities()
 
         faqs = [
             FAQEntry(
