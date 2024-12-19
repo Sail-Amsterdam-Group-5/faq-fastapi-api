@@ -312,7 +312,7 @@ async def mock_data():
                 ),
                 FAQEntry(
                     question="What are my responsibilities as a volunteer?",
-                    answer="""Your responsibilities may include guiding visitors, assisting with event logistics, helping at information points, and ensuring safety protocols are followed during activities. 
+                    answer="""Your responsibilities may include guiding visitors, assisting with event logistics, helping at information points, and ensuring safety protocols are followed during activities.
                     Each role may vary, and you’ll receive detailed instructions beforehand.""",
                     category="Responsibilities",
                 ),
