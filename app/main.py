@@ -10,6 +10,8 @@ import uuid
 # added a comment to check the workings of workflows v4.0
 app = FastAPI()
 
+# Test
+
 logger = logging.getLogger(__name__)
 
 # Azure Table Storage configuration
