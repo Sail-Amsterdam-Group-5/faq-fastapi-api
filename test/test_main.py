@@ -4,7 +4,7 @@ from app.main import app, table_client  # assuming your app is in `main.py`
 
 client = TestClient(app)
 
-#tests
+# tests
 
 # Prepare the mock database
 
