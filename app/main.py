@@ -5,20 +5,9 @@ from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
 from typing import List, Optional
 import logging
 import uuid
-
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.secrets import SecretClient
+import os
 
 logging.basicConfig(level=logging.ERROR)
-
-KEY_VAULT_URL = "https://sailfaqdatabasedevcred.vault.azure.net/"
-
-credential = DefaultAzureCredential()
-
-# Get secret from Azure Key Vault
-secret_name = "sail-faq-dev-database-conn"
-secret_client = SecretClient(vault_url=KEY_VAULT_URL, credential=credential)
-retrieved_secret = secret_client.get_secret(secret_name)
 
 # Initialize FastAPI app
 # added a comment to check the workings of workflows v4.0
@@ -30,24 +19,32 @@ internalServerErrorMsg = "Internal server error occurred."
 faqNotFoundErrorMsg = "FAQ not found."
 failedToFetchFaqErrorMsg = "Failed to fetch FAQ entry"
 
+try:
+    # Read connection string from environment variable
+    connection_string = os.getenv("FAQ_AZURE_CONN_STRING")
+    if not connection_string:
+        raise ValueError("Environment variable FAQ_AZURE_CONN_STRING is not set.")
+except Exception:
+    logger.error("Failed to connect to Azure Table Storage")
+    raise RuntimeError("Could not connect to Azure Table Storage.")
+
 
 class SensitiveDataFilter(logging.Filter):
     def filter(self, record):
         if "retrieved_secret.value" in record.getMessage():
-            record.msg = record.msg.replace(retrieved_secret.value, "[REDACT]")
+            record.msg = record.msg.replace(connection_string, "[REDACTED]")
         return True
 
 
 logger.addFilter(SensitiveDataFilter())
 
 # Azure Table Storage configuration
-AZURE_CONN_STRING = f"{retrieved_secret.value}"  # Azure conn string
 TABLE_NAME = "faqs"
 
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
 # Initialize TableServiceClient
-table_service = TableServiceClient.from_connection_string(AZURE_CONN_STRING)
+table_service = TableServiceClient.from_connection_string(connection_string)
 
 # Ensure the table exists
 try:

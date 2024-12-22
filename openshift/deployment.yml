@@ -18,6 +18,12 @@ spec:
       containers:
         - name: sail-faq-api
           image: earlybirdreal/sail-faq-api:latest
+          env:
+            - name: FAQ_AZURE_CONN_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: faq-azure-storage-secret
+                  key: FAQ_AZURE_CONN_STRING
           ports:
             - containerPort: 8080
           resources:
