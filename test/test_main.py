@@ -3,6 +3,8 @@ from unittest.mock import MagicMock
 from app.main import app, table_client
 from azure.core.exceptions import ResourceNotFoundError
 
+# test
+
 client = TestClient(app)
 
 # Mock data for the tests
