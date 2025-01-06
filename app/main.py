@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, HTTPException, Header, status, Request
 from pydantic import BaseModel, Field
 from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
@@ -7,7 +7,7 @@ import logging
 import uuid
 import os
 
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 # Initialize FastAPI app
 # added a comment to check the workings of workflows v4.0
@@ -127,13 +127,17 @@ async def create_faq_entry(faq: FAQEntry):
 
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(
-    category: Optional[str] = Header(None, description="Category of the FAQs"),
+    request: Request,
+    category: Optional[str] = Header(None, description="Category of the FAQs")
 ):
     """
     Get all FAQs filtered by category passed in the header,
     sorted by the 'Clicks' column.
     """
     try:
+        # Log header data
+        logger.info("Headers received: %s", dict(request.headers))
+
         if category is not None:
             # Fetch all entries for the specified category
             query_filter = f"PartitionKey eq '{category}'"
