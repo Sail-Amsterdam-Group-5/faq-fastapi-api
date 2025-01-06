@@ -6,8 +6,16 @@ from typing import List, Optional
 import logging
 import uuid
 import os
+import sys
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,  # Use DEBUG level to ensure all logs are captured
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),  # Send INFO, DEBUG logs to stdout
+        logging.StreamHandler(sys.stderr),  # Send ERROR, CRITICAL logs to stderr
+    ],
+)
 
 # Initialize FastAPI app
 # added a comment to check the workings of workflows v4.0
@@ -135,6 +143,7 @@ async def get_faqs_by_category(
     sorted by the 'Clicks' column.
     """
     try:
+        print("Testing log output to stdout")
         # Log header data
         logger.info("Headers received: %s", dict(request.headers))
 
