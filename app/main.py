@@ -128,7 +128,7 @@ async def create_faq_entry(faq: FAQEntry):
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(
     request: Request,
-    category: Optional[str] = Header(None, description="Category of the FAQs")
+    category: Optional[str] = Header(None, description="Category of the FAQs"),
 ):
     """
     Get all FAQs filtered by category passed in the header,
