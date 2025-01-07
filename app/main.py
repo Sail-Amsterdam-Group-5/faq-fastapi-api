@@ -33,7 +33,7 @@ invalidRoleErrorMsg = (
 
 try:
     # Read connection string from environment variable
-    connection_string = os.getenv("FAQ_AZURE_CONN_STRING")
+    connection_string = os.getenv("FAQ_AZURE_CONN_STRING", "MOCK_CONNECTION_STRING")
     if not connection_string:
         raise ValueError("Environment variable FAQ_AZURE_CONN_STRING is not set.")
 except Exception:
@@ -55,17 +55,18 @@ TABLE_NAME = "faqs"
 
 notFoundExceptionMessage = "No FAQ with the details provided was found."
 
-# Initialize TableServiceClient
-table_service = TableServiceClient.from_connection_string(connection_string)
-
-# Ensure the table exists
 try:
-    table_client = table_service.create_table_if_not_exists(TABLE_NAME)
-except Exception:
-    logger.error("Failed to initialize Table Storage.")
-    raise RuntimeError(
-        "Failed to initialize Table Storage. Please check the log for details."
-    )
+    if not connection_string or connection_string == "MOCK_CONNECTION_STRING":
+        raise ValueError("Invalid connection string for Azure Table Storage.")
+    table_service = TableServiceClient.from_connection_string(connection_string)
+    table_client = table_service.create_table_if_not_exists("faqs")
+except ValueError as ve:
+    logger.error(f"Connection string error: {ve}")
+    table_service = None  # Use None for local/mock environments
+    table_client = None
+except Exception as e:
+    logger.error(f"Failed to initialize Table Storage: {e}")
+    raise RuntimeError("Could not initialize Azure Table Storage.") from e
 
 
 # Define Pydantic models for input validation
