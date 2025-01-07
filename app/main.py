@@ -9,7 +9,7 @@ import os
 import sys
 
 logging.basicConfig(
-    level=logging.DEBUG,  # Use DEBUG level to ensure all logs are captured
+    level=logging.INFO,  # Use DEBUG level to ensure all logs are captured
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),  # Send INFO, DEBUG logs to stdout
