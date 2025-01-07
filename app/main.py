@@ -93,10 +93,22 @@ class FAQUpdate(BaseModel):
 
 
 @app.post("/faqs", status_code=201)
-async def create_faq_entry(faq: FAQEntry):
+async def create_faq_entry(faq: FAQEntry, request: Request):
     """
     Endpoint to create a new FAQ entry in Azure Table Storage.
     """
+    # Get X-User-Roles from the request headers
+    user_roles = request.headers.get("X-User-Roles")
+    if not user_roles:
+        raise HTTPException(
+            status_code=400, detail="The roles header is missing from the request."
+        )
+    if user_roles != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have the necessary permissions to perform this action.",
+        )
+
     # Use category as PartitionKey
     partition_key = faq.category
     row_key = str(uuid.uuid4())  # Unique identifier for the entry
