@@ -8,6 +8,10 @@ import uuid
 import os
 import sys
 
+# Suppress Azure SDK logs
+azure_logger = logging.getLogger("azure")
+azure_logger.setLevel(logging.WARNING)  # Log only warnings or above
+
 logging.basicConfig(
     level=logging.INFO,  # Use DEBUG level to ensure all logs are captured
     format="%(asctime)s - %(levelname)s - %(message)s",
