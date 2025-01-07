@@ -106,7 +106,7 @@ async def create_faq_entry(faq: FAQEntry, request: Request):
     if "admin" not in user_roles:
         raise HTTPException(
             status_code=403,
-            detail="You do not have the necessary permissions to perform this action.",
+            detail="You do not have the necessary permissions to perform this action. Your roles are: " + user_roles,
         )
 
     # Use category as PartitionKey
