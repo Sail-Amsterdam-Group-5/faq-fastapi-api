@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 internalServerErrorMsg = "Internal server error occurred."
 faqNotFoundErrorMsg = "FAQ not found."
 failedToFetchFaqErrorMsg = "Failed to fetch FAQ entry"
+roleHeaderMissingErrorMsg = "The roles header is missing from the request."
+invalidRoleErrorMsg = (
+    "You do not have the necessary permissions to perform this action."
+)
 
 try:
     # Read connection string from environment variable
@@ -100,14 +104,11 @@ async def create_faq_entry(faq: FAQEntry, request: Request):
     # Get X-User-Roles from the request headers
     user_roles = request.headers.get("X-User-Roles")
     if not user_roles:
-        raise HTTPException(
-            status_code=400, detail="The roles header is missing from the request."
-        )
+        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
     if "admin" not in user_roles:
         raise HTTPException(
             status_code=403,
-            detail="You do not have the necessary permissions to perform this action. Your roles are: "
-            + user_roles,
+            detail=invalidRoleErrorMsg,
         )
 
     # Use category as PartitionKey
@@ -148,7 +149,6 @@ async def create_faq_entry(faq: FAQEntry, request: Request):
 
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(
-    request: Request,
     category: Optional[str] = Header(None, description="Category of the FAQs"),
 ):
     """
@@ -156,10 +156,6 @@ async def get_faqs_by_category(
     sorted by the 'Clicks' column.
     """
     try:
-        print("Testing log output to stdout")
-        # Log header data
-        logger.info("Headers received: %s", dict(request.headers))
-
         if category is not None:
             # Fetch all entries for the specified category
             query_filter = f"PartitionKey eq '{category}'"
@@ -233,12 +229,23 @@ async def get_faq_by_id(faq_id: str, category: str):
 
 
 @app.put("/faqs/{category}/{faq_id}", response_model=FAQEntry)
-async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
+async def update_faq(faq_id: str, category: str, faq: FAQUpdate, request: Request):
     """
     Update an existing FAQ by PartitionKey (category) and RowKey (faq_id).
     If the category is updated, copy the entity to a new PartitionKey,
     delete the old entry, and insert the new one.
     """
+
+    # Get X-User-Roles from the request headers
+    user_roles = request.headers.get("X-User-Roles")
+    if not user_roles:
+        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
+    if "admin" not in user_roles:
+        raise HTTPException(
+            status_code=403,
+            detail=invalidRoleErrorMsg,
+        )
+
     try:
         # Fetch the existing FAQ entity
         entity = table_client.get_entity(partition_key=category, row_key=faq_id)
@@ -304,10 +311,21 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate):
 
 
 @app.delete("/faqs/{category}/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_faq(faq_id: str, category: str):
+async def delete_faq(faq_id: str, category: str, request: Request):
     """
     Delete an FAQ by PartitionKey (category) and RowKey (faq_id).
     """
+
+    # Get X-User-Roles from the request headers
+    user_roles = request.headers.get("X-User-Roles")
+    if not user_roles:
+        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
+    if "admin" not in user_roles:
+        raise HTTPException(
+            status_code=403,
+            detail=invalidRoleErrorMsg,
+        )
+
     try:
         # Delete the FAQ entity
         table_client.delete_entity(partition_key=category, row_key=faq_id)
@@ -354,6 +372,3 @@ async def increment_clicks(category: str, faq_id: str):
     except Exception:
         logger.error(failedToFetchFaqErrorMsg, exc_info=True)
         raise HTTPException(status_code=500, detail=internalServerErrorMsg)
-
-
-# Te
