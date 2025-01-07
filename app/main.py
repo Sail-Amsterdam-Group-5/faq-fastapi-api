@@ -216,6 +216,8 @@ async def get_faq_by_id(faq_id: str, category: str):
             question=entity["Question"],
             answer=entity["Answer"],
             category=entity["PartitionKey"],
+            id=entity["RowKey"],
+            clicks=entity["Clicks"]
         )
 
     except ResourceNotFoundError:
