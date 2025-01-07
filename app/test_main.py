@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-from starlette.responses import Response
 from unittest.mock import MagicMock, patch
 from azure.core.exceptions import ResourceNotFoundError
 from main import app
