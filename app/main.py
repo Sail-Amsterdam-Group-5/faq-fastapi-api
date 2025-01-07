@@ -103,7 +103,7 @@ async def create_faq_entry(faq: FAQEntry, request: Request):
         raise HTTPException(
             status_code=400, detail="The roles header is missing from the request."
         )
-    if user_roles != "admin":
+    if "admin" not in user_roles:
         raise HTTPException(
             status_code=403,
             detail="You do not have the necessary permissions to perform this action.",
