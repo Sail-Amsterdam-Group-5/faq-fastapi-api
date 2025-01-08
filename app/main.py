@@ -12,7 +12,7 @@ import uuid
 import os
 import sys
 
-# Updated requirements.txt
+# Updated requirements.txt 2
 
 # Suppress Azure SDK logs
 azure_logger = logging.getLogger("azure")
