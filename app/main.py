@@ -2,7 +2,11 @@ from fastapi import FastAPI, HTTPException, Header, status, Request
 from pydantic import BaseModel, Field
 from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from typing import List, Optional
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+import time
 import logging
 import uuid
 import os
@@ -71,6 +75,52 @@ except ValueError as ve:
 except Exception as e:
     logger.error(f"Failed to initialize Table Storage: {e}")
     raise RuntimeError("Could not initialize Azure Table Storage.") from e
+
+
+# Initialize Prometheus metrics
+REQUEST_COUNT = Counter(
+    "http_requests_total", "Total HTTP requests", ["method", "endpoint", "http_status"]
+)
+REQUEST_LATENCY = Histogram(
+    "http_request_latency_seconds", "Latency of HTTP requests", ["method", "endpoint"]
+)
+
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to track Prometheus metrics for every request.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        method = request.method
+        endpoint = request.url.path
+        start_time = time.time()
+
+        response = await call_next(request)
+        latency = time.time() - start_time
+        status_code = response.status_code
+
+        # Update Prometheus metrics
+        REQUEST_COUNT.labels(
+            method=method, endpoint=endpoint, http_status=status_code
+        ).inc()
+        REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(latency)
+
+        return response
+
+
+# Add the Prometheus middleware to the FastAPI app
+app.add_middleware(MetricsMiddleware)
+
+
+# Expose the /metrics endpoint for Prometheus to scrape
+@app.get("/metrics")
+def get_metrics():
+    """
+    Endpoint to expose Prometheus metrics.
+    """
+    metrics_data = generate_latest()
+    return Response(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
 
 
 # Define Pydantic models for input validation
