@@ -12,6 +12,8 @@ import uuid
 import os
 import sys
 
+# Updated requirements.txt
+
 # Suppress Azure SDK logs
 azure_logger = logging.getLogger("azure")
 azure_logger.setLevel(logging.WARNING)  # Log only warnings or above
