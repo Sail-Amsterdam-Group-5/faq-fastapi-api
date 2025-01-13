@@ -36,10 +36,13 @@ logger = logging.getLogger(__name__)
 internalServerErrorMsg = "Internal server error occurred."
 faqNotFoundErrorMsg = "FAQ not found."
 failedToFetchFaqErrorMsg = "Failed to fetch FAQ entry"
+notFoundExceptionMessage = "No FAQ with the details provided was found."
 roleHeaderMissingErrorMsg = "The roles header is missing from the request."
 invalidRoleErrorMsg = (
     "You do not have the necessary permissions to perform this action."
 )
+
+logger.info("Attempting to retrieve the connection string...")
 
 try:
     # Read connection string from environment variable
@@ -63,13 +66,14 @@ logger.addFilter(SensitiveDataFilter())
 # Azure Table Storage configuration
 TABLE_NAME = "faqs"
 
-notFoundExceptionMessage = "No FAQ with the details provided was found."
+logger.info("Initializing Azure Table client for FAQ service...")
 
 try:
     if not connection_string or connection_string == "MOCK_CONNECTION_STRING":
         raise ValueError("Invalid connection string for Azure Table Storage.")
     table_service = TableServiceClient.from_connection_string(connection_string)
     table_client = table_service.create_table_if_not_exists("faqs")
+    logger.info("Connected to Azure Table Storage and ensured 'faqs' table exists.")
 except ValueError as ve:
     logger.error(f"Connection string error: {ve}")
     table_service = None  # Use None for local/mock environments
@@ -78,6 +82,7 @@ except Exception as e:
     logger.error(f"Failed to initialize Table Storage: {e}")
     raise RuntimeError("Could not initialize Azure Table Storage.") from e
 
+logger.info("Initializing Prometheus metrics for FAQ service...")
 
 # Initialize Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -107,6 +112,10 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             method=method, endpoint=endpoint, http_status=status_code
         ).inc()
         REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(latency)
+
+        logger.info(
+            f"Request processed in {latency:.3f} seconds with status {status_code}"
+        )
 
         return response
 
@@ -144,6 +153,9 @@ class FAQUpdate(BaseModel):
     question: Optional[str] = Field(None, min_length=5, max_length=500)
     answer: Optional[str] = Field(None, min_length=1, max_length=1000)
     category: Optional[str] = Field(None, min_length=1, max_length=100)
+
+
+logger.info("FAQ service application initialized and running.")
 
 
 # FAQ Endpoints:
