@@ -64,6 +64,36 @@ def test_insert_faq(mock_table_client):
 
 
 @patch("main.table_client")
+def test_insert_faq_missing_fields(mock_table_client):
+    # Mock insert_entity to simulate successful insertion
+    mock_table_client.create_entity = MagicMock()
+
+    new_faq = {
+        "answer": "Python is a programming language.",
+        "category": "Programming",
+        "clicks": 0,
+    }
+
+    response = client.post(
+        "/faqs",
+        headers={"accept": "application/json", "X-User-Roles": "admin"},
+        json=new_faq,
+    )
+
+    # Check for missing 'question' field
+    assert response.status_code == 422
+
+    # Extract the error details
+    error_details = response.json().get("detail", [])
+
+    # Assert that we only have the loc, msg, and type fields
+    assert len(error_details) == 1
+    assert error_details[0]["loc"] == ["body", "question"]
+    assert error_details[0]["msg"] == "Field required"
+    assert error_details[0]["type"] == "missing"
+
+
+@patch("main.table_client")
 def test_insert_faq_with_invalid_role(mock_table_client):
     # Mock insert_entity to simulate a role issue
     mock_table_client.create_entity = MagicMock()
@@ -85,6 +115,31 @@ def test_insert_faq_with_invalid_role(mock_table_client):
     assert response.status_code == 403
     assert response.json() == {
         "detail": "You do not have the necessary permissions to perform this action."
+    }
+
+
+@patch("main.table_client")
+def test_insert_faq_with_missing_role_header(mock_table_client):
+    # Mock insert_entity to simulate successful insertion
+    mock_table_client.create_entity = MagicMock()
+
+    new_faq = {
+        "question": "What is Python?",
+        "answer": "Python is a programming language.",
+        "category": "Programming",
+        "clicks": 0,
+    }
+
+    response = client.post(
+        "/faqs",
+        headers={"accept": "application/json"},
+        json=new_faq,
+    )
+
+    # Check for missing role header
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "The roles header is missing from the request."
     }
 
 

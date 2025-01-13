@@ -156,6 +156,21 @@ class FAQUpdate(BaseModel):
 logger.info("FAQ service application initialized and running.")
 
 
+# Helper function to check roles
+def authorize_role(request: Request, required_role: str):
+    """
+    Helper function to check if the user has the required role from the request headers.
+    """
+    user_roles = request.headers.get("X-User-Roles")
+    if not user_roles:
+        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
+    if required_role not in user_roles:
+        raise HTTPException(
+            status_code=403,
+            detail=invalidRoleErrorMsg,
+        )
+
+
 # FAQ Endpoints:
 
 
@@ -168,15 +183,8 @@ async def create_faq_entry(faq: FAQEntry, request: Request):
     """
     Endpoint to create a new FAQ entry in Azure Table Storage.
     """
-    # Get X-User-Roles from the request headers
-    user_roles = request.headers.get("X-User-Roles")
-    if not user_roles:
-        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
-    if "admin" not in user_roles:
-        raise HTTPException(
-            status_code=403,
-            detail=invalidRoleErrorMsg,
-        )
+    # Check if user has 'admin' role
+    authorize_role(request, "admin")
 
     # Use category as PartitionKey
     partition_key = faq.category
@@ -305,15 +313,8 @@ async def update_faq(faq_id: str, category: str, faq: FAQUpdate, request: Reques
     delete the old entry, and insert the new one.
     """
 
-    # Get X-User-Roles from the request headers
-    user_roles = request.headers.get("X-User-Roles")
-    if not user_roles:
-        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
-    if "admin" not in user_roles:
-        raise HTTPException(
-            status_code=403,
-            detail=invalidRoleErrorMsg,
-        )
+    # Check if user has 'admin' role
+    authorize_role(request, "admin")
 
     try:
         # Fetch the existing FAQ entity
@@ -385,15 +386,8 @@ async def delete_faq(faq_id: str, category: str, request: Request):
     Delete an FAQ by PartitionKey (category) and RowKey (faq_id).
     """
 
-    # Get X-User-Roles from the request headers
-    user_roles = request.headers.get("X-User-Roles")
-    if not user_roles:
-        raise HTTPException(status_code=400, detail=roleHeaderMissingErrorMsg)
-    if "admin" not in user_roles:
-        raise HTTPException(
-            status_code=403,
-            detail=invalidRoleErrorMsg,
-        )
+    # Check if user has 'admin' role
+    authorize_role(request, "admin")
 
     try:
         # Delete the FAQ entity
