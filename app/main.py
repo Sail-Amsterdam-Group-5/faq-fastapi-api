@@ -12,26 +12,26 @@ import uuid
 import os
 import sys
 
-# Updated requirements.txt 2
-
 # Suppress Azure SDK logs
 azure_logger = logging.getLogger("azure")
 azure_logger.setLevel(logging.WARNING)  # Log only warnings or above
 
-logging.basicConfig(
-    level=logging.INFO,  # Use DEBUG level to ensure all logs are captured
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # Send INFO, DEBUG logs to stdout
-        logging.StreamHandler(sys.stderr),  # Send ERROR, CRITICAL logs to stderr
-    ],
-)
-
 # Initialize FastAPI app
-# added a comment to check the workings of workflows v4.0
 app = FastAPI()
 
 logger = logging.getLogger(__name__)
+
+# Avoid duplicate handlers
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stdout)  # Default to stdout
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+# Set the logging level
+logger.setLevel(logging.INFO)
 
 internalServerErrorMsg = "Internal server error occurred."
 faqNotFoundErrorMsg = "FAQ not found."
