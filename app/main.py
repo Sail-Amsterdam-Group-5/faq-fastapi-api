@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, status, Request
+from fastapi import FastAPI, HTTPException, status, Request, Query
 from pydantic import BaseModel, Field
 from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
@@ -224,7 +224,7 @@ async def create_faq_entry(faq: FAQEntry, request: Request):
 
 @app.get("/faqs", response_model=List[FAQEntry])
 async def get_faqs_by_category(
-    category: Optional[str] = Header(None, description="Category of the FAQs"),
+    category: Optional[str] = Query(None, description="Category of the FAQs"),
 ):
     """
     Get all FAQs filtered by category passed in the header,

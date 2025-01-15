@@ -162,7 +162,7 @@ def test_get_faqs_by_category(mock_table_client):
     mock_table_client.query_entities = MagicMock(side_effect=mock_query_entities)
 
     response = client.get(
-        "/faqs", headers={"accept": "application/json", "Category": "General"}
+        "/faqs?category=General", headers={"accept": "application/json"}
     )
 
     assert response.status_code == 200
@@ -177,7 +177,7 @@ def test_get_faqs_by_non_existing_category(mock_table_client):
     mock_table_client.query_entities = MagicMock(side_effect=mock_query_entities)
 
     response = client.get(
-        "/faqs", headers={"accept": "application/json", "category": "NonExistent"}
+        "/faqs?category=nonExistent", headers={"accept": "application/json"}
     )
 
     assert response.status_code == 404
