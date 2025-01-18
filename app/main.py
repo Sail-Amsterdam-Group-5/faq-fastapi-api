@@ -5,6 +5,8 @@ from utils.metrics_middleware import MetricsMiddleware
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from starlette.responses import Response
 
+# Test
+
 # Initialize logger
 logger = setup_logger()
 
