@@ -138,6 +138,7 @@ def test_create_faq_invalid_data():
     response = client.post("/faqs", json=invalid_faq_data)
     assert response.status_code == 422  # Unprocessable Entity
 
+
 # Lets run some tests
 
 # Test for PUT /faqs/{category}/{faq_id} with invalid data
