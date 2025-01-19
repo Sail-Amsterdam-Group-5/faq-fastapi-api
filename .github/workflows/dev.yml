@@ -76,22 +76,6 @@ jobs:
         - name: Checkout code
           uses: actions/checkout@v3
 
-        # Step 2: Set up OpenShift CLI
-        - name: Install OpenShift CLI
-          run: |
-            curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xz -C /usr/local/bin
-            oc version
-
-        # Step 3: Log in to OpenShift
-        - name: Log in to OpenShift
-          run: |
-            oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=${{ secrets.OPENSHIFT_SERVER }}
-
-        # Step 4: Switch to the target namespace/project
-        - name: Switch namespace
-          run: |
-            oc project oscar-dev
-
         # Step 5: Build and Push Docker Image
         - name: Build and push Docker image
           run: |
@@ -100,6 +84,12 @@ jobs:
             docker push earlybirdreal/sail-faq-api:latest
 
         # Step 6: Deploy to OpenShift
-        - name: Apply deployment configuration
+        - name: Update deployment.yml
           run: |
-            oc apply -f openshift/deployment.yml
+            cd openshift
+            sed -i "s|image: earlybirdreal/sail-faq-api:.*|image: earlybirdreal/sail-faq-api:${{ github.sha }}|" deployment.yml
+            git config --global user.name 'GitHub Actions'
+            git config --global user.email 'actions@github.com'
+            git add deployment.yml
+            git commit -m "Update deployment.yml"
+            git push
