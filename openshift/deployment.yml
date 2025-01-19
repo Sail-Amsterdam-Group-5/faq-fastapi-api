@@ -32,10 +32,10 @@ spec:
             - containerPort: 8080
           resources:
             limits:
-              cpu: "0.2"
+              cpu: "0.1"
               memory: "490Mi"
             requests:
-              cpu: "0.1"
+              cpu: "0.05"
               memory: "50Mi"
       imagePullSecrets:
       - name: regcred
