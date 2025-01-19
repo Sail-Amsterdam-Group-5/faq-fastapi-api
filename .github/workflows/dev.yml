@@ -64,9 +64,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 4: Run Tests (if you have any)
-      # - name: Run tests
-      #   run: pytest || echo "No tests available, skipping."
+      # Step 4: Run Tests
+      - name: Run tests
+        run: pytest || echo "No tests available, skipping."
 
   deploy:
       runs-on: ubuntu-latest
