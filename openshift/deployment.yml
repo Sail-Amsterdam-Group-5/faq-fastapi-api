@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: sail-faq-api
-          image: earlybirdreal/sail-faq-api:72acaa1dfb3a78119cf53ea9f15aa031c0c1dd6a
+          image: earlybirdreal/sail-faq-api:4c287299d975a8b3c4a8d572ca5198e201c3e7db
           env:
             - name: FAQ_AZURE_CONN_STRING
               valueFrom:
