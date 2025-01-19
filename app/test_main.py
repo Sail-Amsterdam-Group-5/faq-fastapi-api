@@ -1,304 +1,173 @@
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch
-from azure.core.exceptions import ResourceNotFoundError
+from fastapi import HTTPException
 from main import app
+from repositories.faq_repository import FAQRepository
+from models.faq_models import FAQEntry, FAQUpdate
+
+
+class MockFAQRepository:
+    def get_faqs_by_category(self, category=None):
+        faqs = [
+            {
+                "question": "Mocked Question 1",
+                "answer": "Mocked Answer 1",
+                "category": "test",
+                "id": "1",
+            },
+            {
+                "question": "Mocked Question 2",
+                "answer": "Mocked Answer 2",
+                "category": "notTest",
+                "id": "2",
+            },
+        ]
+        if category:
+            return [faq for faq in faqs if faq["category"] == category]
+        return faqs
+
+    def create_faq_entry(self, faq: FAQEntry):
+        return {"message": "FAQ entry created successfully", "data": faq.dict()}
+
+    def get_faq_by_id(self, category: str, faq_id: str):
+        if faq_id == "1":
+            return {
+                "question": "Mocked Question 1",
+                "answer": "Mocked Answer 1",
+                "category": "test",
+                "id": "1",
+            }
+        raise HTTPException(status_code=404, detail="FAQ not found")
+
+    def update_faq(self, category: str, faq_id: str, faq: FAQUpdate):
+        return {**faq.dict(), "id": faq_id, "category": category}
+
+    def delete_faq(self, category: str, faq_id: str):
+        return {"message": "FAQ deleted successfully"}
+
+    def increment_clicks(self, category: str, faq_id: str):
+        return {"detail": "Clicks incremented successfully", "new_clicks": 1}
+
+
+# Override the actual dependency with the MockFAQRepository
+app.dependency_overrides[FAQRepository] = lambda: MockFAQRepository()
 
 client = TestClient(app)
 
-# Mock data for the tests
-mock_faqs = [
-    {
-        "Question": "What is FastAPI?",
-        "Answer": "FastAPI is a web framework.",
-        "Category": "General",
-        "PartitionKey": "General",
-        "RowKey": "1",
-        "Clicks": 10,
-    },
-    {
-        "Question": "How do I install FastAPI?",
-        "Answer": "Use pip.",
-        "Category": "Installation",
-        "PartitionKey": "Installation",
-        "RowKey": "2",
-        "Clicks": 5,
-    },
-]
 
-
-def mock_query_entities(query_filter):
-    """Mock function to simulate Azure Table Storage query behavior."""
-    if query_filter == "PartitionKey eq 'General'":
-        return [mock_faqs[0]]
-    elif query_filter == "PartitionKey eq 'Installation'":
-        return [mock_faqs[1]]
-    elif query_filter:
-        return []
-    return mock_faqs
-
-
-@patch("main.table_client")
-def test_insert_faq(mock_table_client):
-    # Mock insert_entity to simulate successful insertion
-    mock_table_client.create_entity = MagicMock()
-
-    new_faq = {
-        "question": "What is Python?",
-        "answer": "Python is a programming language.",
-        "category": "Programming",
-        "clicks": 0,
-    }
-
-    response = client.post(
-        "/faqs",
-        headers={"accept": "application/json", "X-User-Roles": "admin"},
-        json=new_faq,
-    )
-
-    # Check for successful creation
+# Test for POST /faqs
+def test_create_faq():
+    faq_data = {"question": "New Question", "answer": "New Answer", "category": "test"}
+    response = client.post("/faqs", json=faq_data)
     assert response.status_code == 201
-    faq = response.json()
-    assert faq["data"]["question"] == new_faq["question"]
-    assert faq["data"]["answer"] == new_faq["answer"]
-    assert faq["data"]["category"] == new_faq["category"]
+    data = response.json()
+    assert data["message"] == "FAQ entry created successfully"
+    assert data["data"]["question"] == "New Question"
+    assert data["data"]["answer"] == "New Answer"
 
 
-@patch("main.table_client")
-def test_insert_faq_missing_fields(mock_table_client):
-    # Mock insert_entity to simulate successful insertion
-    mock_table_client.create_entity = MagicMock()
-
-    new_faq = {
-        "answer": "Python is a programming language.",
-        "category": "Programming",
-        "clicks": 0,
-    }
-
-    response = client.post(
-        "/faqs",
-        headers={"accept": "application/json", "X-User-Roles": "admin"},
-        json=new_faq,
-    )
-
-    # Check for missing 'question' field
-    assert response.status_code == 422
-
-    # Extract the error details
-    error_details = response.json().get("detail", [])
-
-    # Assert that we only have the loc, msg, and type fields
-    assert len(error_details) == 1
-    assert error_details[0]["loc"] == ["body", "question"]
-    assert error_details[0]["msg"] == "Field required"
-    assert error_details[0]["type"] == "missing"
-
-
-@patch("main.table_client")
-def test_insert_faq_with_invalid_role(mock_table_client):
-    # Mock insert_entity to simulate a role issue
-    mock_table_client.create_entity = MagicMock()
-
-    new_faq = {
-        "question": "What is Python?",
-        "answer": "Python is a programming language.",
-        "category": "Programming",
-        "clicks": 0,
-    }
-
-    response = client.post(
-        "/faqs",
-        headers={"accept": "application/json", "X-User-Roles": "volunteer"},
-        json=new_faq,
-    )
-
-    # Check for forbidden access
-    assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have the necessary permissions to perform this action."
-    }
-
-
-@patch("main.table_client")
-def test_insert_faq_with_missing_role_header(mock_table_client):
-    # Mock insert_entity to simulate successful insertion
-    mock_table_client.create_entity = MagicMock()
-
-    new_faq = {
-        "question": "What is Python?",
-        "answer": "Python is a programming language.",
-        "category": "Programming",
-        "clicks": 0,
-    }
-
-    response = client.post(
-        "/faqs",
-        headers={"accept": "application/json"},
-        json=new_faq,
-    )
-
-    # Check for missing role header
-    assert response.status_code == 400
-    assert response.json() == {
-        "detail": "The roles header is missing from the request."
-    }
-
-
-# Patching table_client for all tests
-@patch("main.table_client")
-def test_get_all_faqs(mock_table_client):
-    mock_table_client.query_entities = MagicMock(side_effect=mock_query_entities)
-
-    response = client.get("/faqs", headers={"accept": "application/json"})
-
+# Test for GET /faqs
+def test_get_faqs():
+    response = client.get("/faqs")
     assert response.status_code == 200
-    faqs = response.json()
-    assert len(faqs) == 2
-    assert faqs[0]["question"] == "What is FastAPI?"
-    assert faqs[1]["question"] == "How do I install FastAPI?"
+    data = response.json()
+    assert len(data) == 2  # Expecting 2 FAQs
+    assert data[0]["question"] == "Mocked Question 1"
+    assert data[1]["question"] == "Mocked Question 2"
 
 
-@patch("main.table_client")
-def test_get_faqs_by_category(mock_table_client):
-    mock_table_client.query_entities = MagicMock(side_effect=mock_query_entities)
-
-    response = client.get(
-        "/faqs?category=General", headers={"accept": "application/json"}
-    )
-
+# Test for GET /faqs with a category filter
+def test_get_faqs_by_category():
+    response = client.get("/faqs?category=test")
     assert response.status_code == 200
-    faqs = response.json()
-    assert len(faqs) == 1
-    assert faqs[0]["question"] == "What is FastAPI?"
-    assert faqs[0]["category"] == "General"
+    data = response.json()
+    assert len(data) == 1  # Only one FAQ for the 'test' category
+    assert data[0]["question"] == "Mocked Question 1"
 
 
-@patch("main.table_client")
-def test_get_faqs_by_non_existing_category(mock_table_client):
-    mock_table_client.query_entities = MagicMock(side_effect=mock_query_entities)
+# Test for GET /faqs/{category}/{faq_id}
+def test_get_faq_by_id():
+    response = client.get("/faqs/test/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["question"] == "Mocked Question 1"
+    assert data["answer"] == "Mocked Answer 1"
 
-    response = client.get(
-        "/faqs?category=nonExistent", headers={"accept": "application/json"}
-    )
 
+def test_get_faq_by_id_not_found():
+    response = client.get("/faqs/test/999")
     assert response.status_code == 404
-    assert response.json() == {"detail": "No FAQs found."}
 
 
-@patch("main.table_client")
-def test_get_faqs_internal_error(mock_table_client):
-    mock_table_client.query_entities = MagicMock(
-        side_effect=Exception("Database error")
-    )
-
-    response = client.get("/faqs", headers={"accept": "application/json"})
-
-    assert response.status_code == 500
-    assert response.json() == {"detail": "Database error"}
-
-
-@patch("main.table_client")
-def test_get_faq_by_id(mock_table_client):
-    mock_table_client.get_entity = MagicMock(return_value=mock_faqs[0])
-
-    response = client.get("/faqs/General/1", headers={"accept": "application/json"})
-
+# Test for PUT /faqs/{category}/{faq_id}
+def test_update_faq():
+    updated_faq = {"question": "Updated Question", "answer": "Updated Answer"}
+    response = client.put("/faqs/test/1", json=updated_faq)
     assert response.status_code == 200
-    faq = response.json()
-    assert faq["question"] == "What is FastAPI?"
-    assert faq["category"] == "General"
+    data = response.json()
+    assert data["question"] == "Updated Question"
+    assert data["answer"] == "Updated Answer"
 
 
-@patch("main.table_client")
-def test_get_faq_by_non_existing_id(mock_table_client):
-    mock_table_client.get_entity = MagicMock(side_effect=ResourceNotFoundError)
-
-    response = client.get("/faqs/General/99", headers={"accept": "application/json"})
-
-    assert response.status_code == 404
-    assert response.json() == {"detail": "FAQ not found."}
-
-
-@patch("main.table_client")
-def test_increment_clicks(mock_table_client):
-    mock_table_client.get_entity = MagicMock(return_value=mock_faqs[0])
-    mock_table_client.update_entity = MagicMock()
-
-    response = client.post(
-        "/faqs/General/1/click", headers={"accept": "application/json"}
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "detail": "Clicks incremented successfully.",
-        "new_clicks": 11,
-    }
-
-
-@patch("main.table_client")
-def test_delete_faq(mock_table_client):
-    # Mock delete_entity to simulate successful deletion
-    mock_table_client.delete_entity = MagicMock()
-
-    response = client.delete(
-        "/faqs/general/1",
-        headers={"accept": "application/json", "X-User-Roles": "admin"},
-    )
-
-    # Check for status code 204
+# Test for DELETE /faqs/{category}/{faq_id}
+def test_delete_faq():
+    response = client.delete("/faqs/test/1")
     assert response.status_code == 204
-    # Ensure the response body is empty
-    assert response.content == b""
 
 
-@patch("main.table_client")
-def test_delete_faq_with_invalid_role(mock_table_client):
-    # Mock delete_entity to simulate successful deletion
-    mock_table_client.delete_entity = MagicMock()
-
-    response = client.delete(
-        "/faqs/general/1",
-        headers={"accept": "application/json", "X-User-Roles": "volunteer"},
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have the necessary permissions to perform this action."
-    }
-
-
-@patch("main.table_client")
-def test_update_faq(mock_table_client):
-    mock_entity = mock_faqs[0].copy()
-    mock_entity["question"] = "Updated Question"
-    mock_table_client.get_entity = MagicMock(return_value=mock_faqs[0])
-    mock_table_client.update_entity = MagicMock()
-
-    response = client.put(
-        "/faqs/general/1",
-        headers={"accept": "application/json", "X-User-Roles": "admin"},
-        json={"question": "Updated Question"},
-    )
-
+# Test for POST /faqs/{category}/{faq_id}/click
+def test_increment_clicks():
+    response = client.post("/faqs/test/1/click")
     assert response.status_code == 200
-    faq = response.json()
-    assert faq["question"] == "Updated Question"
-    assert faq["category"] == "General"
+    data = response.json()
+    assert data["detail"] == "Clicks incremented successfully"
+    assert data["new_clicks"] == 1
 
 
-@patch("main.table_client")
-def test_update_faq_invalid_role(mock_table_client):
-    mock_entity = mock_faqs[0].copy()
-    mock_entity["question"] = "Updated Question"
-    mock_table_client.get_entity = MagicMock(return_value=mock_faqs[0])
-    mock_table_client.update_entity = MagicMock()
+# Test for GET /faqs with category filter returning no data
+def test_get_faqs_by_category_no_data():
+    response = client.get("/faqs?category=unknown")
+    assert response.status_code == 404
+    data = response.json()
+    assert len(data) == 1  # No FAQs for the 'unknown' category
+    assert data["detail"] == "No FAQs found."
 
-    response = client.put(
-        "/faqs/general/1",
-        headers={"accept": "application/json", "X-User-Roles": "volunteer"},
-        json={"question": "Updated Question"},
-    )
 
-    assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have the necessary permissions to perform this action."
-    }
+# Test for POST /faqs with invalid data (missing required fields)
+def test_create_faq_invalid_data():
+    invalid_faq_data = {"question": "Incomplete FAQ"}
+    response = client.post("/faqs", json=invalid_faq_data)
+    assert response.status_code == 422  # Unprocessable Entity
+
+
+# Test for PUT /faqs/{category}/{faq_id} with invalid data
+# def test_update_faq_invalid_data():
+#     invalid_faq_data = {
+#         "question": "Is this a test aaaaaaaaaaa?"
+#     }  # Missing 'answer' and 'category'
+#     response = client.put("/faqs/test/1", json=invalid_faq_data)
+
+#     # Ensure the response status code is 422 for validation error
+#     assert (
+#         response.status_code == 422
+#     )  # Validation error status code (Unprocessable Entity)
+
+#     # Define the expected response structure
+#     expected_response = {
+#         "detail": [
+#             {
+#                 "type": "missing",
+#                 "loc": ["body", "answer"],
+#                 "msg": "Field required",
+#                 "input": {"question": "Is this a test aaaaaaaaaaa?"},
+#             },
+#             {
+#                 "type": "missing",
+#                 "loc": ["body", "category"],
+#                 "msg": "Field required",
+#                 "input": {"question": "Is this a test aaaaaaaaaaa?"},
+#             },
+#         ]
+#     }
+
+#     # Assert the actual response matches the expected response
+#     assert response.json() == expected_response

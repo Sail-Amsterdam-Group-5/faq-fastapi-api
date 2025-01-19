@@ -5,8 +5,8 @@ from typing import Optional
 
 
 class FAQService:
-    def __init__(self):
-        self.repository = FAQRepository()
+    def __init__(self, repository: FAQRepository):
+        self.repository = repository
 
     def create_faq_entry(self, faq: FAQEntry):
         return self.repository.create_faq_entry(faq)
