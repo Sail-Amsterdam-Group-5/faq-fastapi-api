@@ -6,6 +6,7 @@ from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from starlette.responses import Response
 
 # Test
+# Test 2.0
 
 # Initialize logger
 logger = setup_logger()
