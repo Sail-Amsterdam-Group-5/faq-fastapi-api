@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from main import app
 from repositories.faq_repository import FAQRepository
 from models.faq_models import FAQEntry, FAQUpdate
+from azure.core.exceptions import ResourceNotFoundError
 
 
 class MockFAQRepository:
@@ -52,12 +53,22 @@ class MockFAQRepository:
         return {**faq.dict(), "id": faq_id, "category": category}
 
     def delete_faq(self, category: str, faq_id: str):
+        if not (
+            (faq_id == "1" and category == "test")
+            or (faq_id == "2" and category == "notTest")
+        ):
+            raise ResourceNotFoundError(f"FAQ entry with ID {faq_id} not found in category {category}.")
+
         return {
             "success": True,
             "message": f"FAQ with ID '{faq_id}' successfully deleted from category '{category}'.",
         }
 
     def increment_clicks(self, category: str, faq_id: str):
+        if faq_id != "1" or category != "test":
+            raise HTTPException(
+                status_code=404, detail=f"FAQ entry with ID {faq_id} not found."
+            )
         return 1
 
 
@@ -80,6 +91,24 @@ def test_create_faq():
     assert data["message"] == "FAQ entry created successfully"
     assert data["data"]["question"] == "New Question"
     assert data["data"]["answer"] == "New Answer"
+
+
+def test_create_faq_missing_fields():
+    incomplete_faq_data = {
+        "question": "Incomplete Question"
+    }  # Missing 'answer' and 'category'
+    response = client.post("/faqs", json=incomplete_faq_data)
+    assert response.status_code == 422
+
+
+def test_create_faq_input_too_short():
+    incomplete_faq_data = {
+        "question": "In",
+        "answer": "com",
+        "category": "plete",
+    }  # Missing 'answer' and 'category'
+    response = client.post("/faqs", json=incomplete_faq_data)
+    assert response.status_code == 422
 
 
 # Test for GET /faqs
@@ -131,6 +160,13 @@ def test_delete_faq():
     assert response.status_code == 200
 
 
+def test_delete_nonexistent_faq():
+    response = client.delete("/faqs/test/999")
+    assert response.status_code == 404
+    data = response.json()
+    assert data["detail"] == "FAQ entry with ID 999 not found in category test."
+
+
 # Test for POST /faqs/{category}/{faq_id}/click
 def test_increment_clicks():
     response = client.post("/faqs/test/1/click")
@@ -138,6 +174,13 @@ def test_increment_clicks():
     data = response.json()
     assert data["detail"] == "Clicks incremented successfully."
     assert data["new_clicks"] == 1
+
+
+def test_increment_clicks_nonexistent():
+    response = client.post("/faqs/test/999/click")
+    assert response.status_code == 404
+    data = response.json()
+    assert data["detail"] == "FAQ entry with ID 999 not found."
 
 
 # Test for GET /faqs with category filter returning no data
@@ -156,37 +199,15 @@ def test_create_faq_invalid_data():
     assert response.status_code == 422  # Unprocessable Entity
 
 
-# Lets run some tests
+# Test for PUT /faqs/{category}/{faq_id} with invalid data (empty fields)
+def test_update_faq_empty_fields():
+    updated_faq = {"question": "", "answer": ""}
+    response = client.put("/faqs/test/1", json=updated_faq)
+    assert response.status_code == 422
 
-# Test for PUT /faqs/{category}/{faq_id} with invalid data
-# def test_update_faq_invalid_data():
-#     invalid_faq_data = {
-#         "question": "Is this a test aaaaaaaaaaa?"
-#     }  # Missing 'answer' and 'category'
-#     response = client.put("/faqs/test/1", json=invalid_faq_data)
 
-#     # Ensure the response status code is 422 for validation error
-#     assert (
-#         response.status_code == 422
-#     )  # Validation error status code (Unprocessable Entity)
-
-#     # Define the expected response structure
-#     expected_response = {
-#         "detail": [
-#             {
-#                 "type": "missing",
-#                 "loc": ["body", "answer"],
-#                 "msg": "Field required",
-#                 "input": {"question": "Is this a test aaaaaaaaaaa?"},
-#             },
-#             {
-#                 "type": "missing",
-#                 "loc": ["body", "category"],
-#                 "msg": "Field required",
-#                 "input": {"question": "Is this a test aaaaaaaaaaa?"},
-#             },
-#         ]
-#     }
-
-#     # Assert the actual response matches the expected response
-#     assert response.json() == expected_response
+# Test for PUT /faqs/{category}/{faq_id} with invalid data (empty fields)
+def test_update_faq_no_fields():
+    updated_faq = {}
+    response = client.put("/faqs/test/1", json=updated_faq)
+    assert response.status_code == 400

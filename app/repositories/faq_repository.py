@@ -202,18 +202,7 @@ class FAQRepository:
             }
 
         except ResourceNotFoundError:
-            # Handle case where the entity does not exist
-            return {
-                "success": False,
-                "message": f"FAQ with ID '{faq_id}' not found in category '{category}'.",
-            }
-
-        except Exception as e:
-            # Handle unexpected errors
-            return {
-                "success": False,
-                "message": f"An unexpected error occurred while trying to delete the FAQ: {str(e)}",
-            }
+            raise ResourceNotFoundError("FAQ entry not found.")
 
     def increment_clicks(self, category: str, faq_id: str):
         """

@@ -75,6 +75,12 @@ class FAQService:
 
     def update_faq(self, category: str, faq_id: str, faq: FAQUpdate):
         try:
+            if faq.question is None and faq.answer is None and faq.category is None:
+                # If no fields are provided to update, return a 400 error
+                raise HTTPException(
+                    status_code=400, detail="No fields provided to update."
+                )
+
             # Call the repository method to update the FAQ entry
             updated_faq = self.repository.update_faq(category, faq_id, faq)
             return updated_faq
@@ -94,13 +100,12 @@ class FAQService:
         Calls the repository to delete an FAQ.
         Raises exceptions for failure or returns a success message.
         """
-        result = self.repository.delete_faq(category, faq_id)
+        try:
+            result = self.repository.delete_faq(category, faq_id)
 
-        if not result["success"]:
-            if "not found" in result["message"].lower():
-                raise HTTPException(status_code=404, detail=result["message"])
-            else:
-                raise HTTPException(status_code=500, detail=result["message"])
+        except ResourceNotFoundError as e:
+            # If the FAQ entry is not found, raise a 404 error
+            raise HTTPException(status_code=404, detail=e.message)
 
         return {"message": result["message"]}
 
