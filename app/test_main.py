@@ -57,7 +57,9 @@ class MockFAQRepository:
             (faq_id == "1" and category == "test")
             or (faq_id == "2" and category == "notTest")
         ):
-            raise ResourceNotFoundError(f"FAQ entry with ID {faq_id} not found in category {category}.")
+            raise ResourceNotFoundError(
+                f"FAQ entry with ID {faq_id} not found in category {category}."
+            )
 
         return {
             "success": True,
