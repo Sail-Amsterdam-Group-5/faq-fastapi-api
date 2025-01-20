@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from typing import List, Optional
 from models.faq_models import FAQEntry, FAQUpdate
 from services.faq_service import FAQService
@@ -7,7 +7,7 @@ from repositories.faq_repository import FAQRepository
 router = APIRouter()
 
 
-# Dependency for creating FAQService with injected FAQRepository
+# Dependency for creating FAQService with injected FAQRepository and
 def get_faq_service(repository: FAQRepository = Depends(FAQRepository)) -> FAQService:
     return FAQService(repository)
 
@@ -43,10 +43,14 @@ async def update_faq(
     return faq_service.update_faq(category, faq_id, faq)
 
 
-@router.delete("/faqs/{category}/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/faqs/{category}/{faq_id}")
 async def delete_faq(
     category: str, faq_id: str, faq_service: FAQService = Depends(get_faq_service)
 ):
+    """
+    Deletes an FAQ by category and ID.
+    Returns a success message or raises an exception on failure.
+    """
     return faq_service.delete_faq(category, faq_id)
 
 
