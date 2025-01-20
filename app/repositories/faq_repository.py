@@ -81,7 +81,7 @@ class FAQRepository:
             self.logger.error(
                 f"Error fetching FAQs from Azure Table Storage: {str(e)}", exc_info=True
             )
-            raise DatabaseError("Error while fetching data from Azure Table Storage. No connection could be made. Try again in a moment.")
+            raise DatabaseError("Error while fetching data from Azure Table Storage. No connection could be made.")
 
         except Exception as e:
             # General exception catch for other unforeseen issues
