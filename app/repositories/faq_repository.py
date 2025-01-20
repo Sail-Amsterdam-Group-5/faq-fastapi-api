@@ -1,5 +1,10 @@
 from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
-from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError, AzureError, ServiceRequestError
+from azure.core.exceptions import (
+    ResourceNotFoundError,
+    ResourceExistsError,
+    AzureError,
+    ServiceRequestError,
+)
 from models.faq_models import FAQEntry, FAQUpdate
 from errors import DatabaseError
 import uuid
@@ -76,12 +81,14 @@ class FAQRepository:
                 f"Error fetching FAQs from Azure Table Storage: {str(e)}", exc_info=True
             )
             raise DatabaseError("Error while fetching data from Azure Table Storage.")
-        
+
         except ServiceRequestError as e:
             self.logger.error(
                 f"Error fetching FAQs from Azure Table Storage: {str(e)}", exc_info=True
             )
-            raise DatabaseError("Error while fetching data from Azure Table Storage. No connection could be made.")
+            raise DatabaseError(
+                "Error while fetching data from Azure Table Storage. No connection could be made."
+            )
 
         except Exception as e:
             # General exception catch for other unforeseen issues
