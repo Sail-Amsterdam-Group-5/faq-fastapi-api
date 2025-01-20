@@ -29,15 +29,11 @@ class FAQService:
                     "category": faq_entity["PartitionKey"],
                 },
             }
+
         except ResourceExistsError as e:
             # Handle conflict if FAQ entry already exists
             self.logger.error(f"Conflict while creating FAQ entry: {str(e)}")
             raise HTTPException(status_code=409, detail="FAQ entry already exists")
-
-        except Exception as e:
-            # Catch any other exceptions and log the error
-            self.logger.error(f"Failed to create FAQ entry: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Internal Server Error")
 
     def get_faqs_by_category(self, category: Optional[str] = None):
         """
@@ -77,13 +73,6 @@ class FAQService:
                 detail="No FAQ with the provided id and cetegory exists.",
             )
 
-        except Exception:
-            # Catch any other exceptions (unexpected errors) and raise a 500 error
-            raise HTTPException(
-                status_code=500,
-                detail="An unexpected error occurred while fetching the FAQ.",
-            )
-
     def update_faq(self, category: str, faq_id: str, faq: FAQUpdate):
         try:
             # Call the repository method to update the FAQ entry
@@ -93,14 +82,12 @@ class FAQService:
         except ResourceNotFoundError:
             # If the FAQ is not found, throw a 404 error
             raise HTTPException(status_code=404, detail="FAQ entry not found.")
+
         except DatabaseError as e:
             # If there is a database-related error (e.g., Azure error), throw a 500 error
             raise HTTPException(
                 status_code=500, detail=f"Database error occurred: {e.message}"
             )
-        except Exception:
-            # Catch any unforeseen errors
-            raise HTTPException(status_code=500, detail="Internal server error.")
 
     def delete_faq(self, category: str, faq_id: str):
         """
@@ -142,15 +129,4 @@ class FAQService:
             raise HTTPException(
                 status_code=500,
                 detail="Error interacting with Azure Table Storage database.",
-            )
-
-        except Exception as e:
-            # Catch any unforeseen errors, log, and raise a 500 error
-            self.logger.error(
-                f"Failed to increment clicks for FAQ entry {faq_id}: {str(e)}",
-                exc_info=True,
-            )
-            raise HTTPException(
-                status_code=500,
-                detail="An unexpected error occurred while incrementing clicks.",
             )

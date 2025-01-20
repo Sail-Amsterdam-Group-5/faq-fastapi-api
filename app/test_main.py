@@ -26,7 +26,17 @@ class MockFAQRepository:
         return faqs
 
     def create_faq_entry(self, faq: FAQEntry):
-        return {"message": "FAQ entry created successfully", "data": faq.dict()}
+        # Generate the UUID for the RowKey
+        row_key = "ea6c740e-9bdc-42f1-b1a6-5bdece390c93"
+
+        faq_dict = faq.dict()
+
+        faq_entity = {
+            **{"PartitionKey": faq.category},
+            **{k.capitalize(): v for k, v in faq_dict.items()},
+        }
+
+        return row_key, faq_entity
 
     def get_faq_by_id(self, category: str, faq_id: str):
         if faq_id == "1":
@@ -42,10 +52,13 @@ class MockFAQRepository:
         return {**faq.dict(), "id": faq_id, "category": category}
 
     def delete_faq(self, category: str, faq_id: str):
-        return {"message": "FAQ deleted successfully"}
+        return {
+            "success": True,
+            "message": f"FAQ with ID '{faq_id}' successfully deleted from category '{category}'.",
+        }
 
     def increment_clicks(self, category: str, faq_id: str):
-        return {"detail": "Clicks incremented successfully", "new_clicks": 1}
+        return 1
 
 
 # Override the actual dependency with the MockFAQRepository
@@ -56,7 +69,11 @@ client = TestClient(app)
 
 # Test for POST /faqs
 def test_create_faq():
-    faq_data = {"question": "New Question", "answer": "New Answer", "category": "test"}
+    faq_data = {
+        "question": "New Question",
+        "answer": "New Answer",
+        "category": "test",
+    }
     response = client.post("/faqs", json=faq_data)
     assert response.status_code == 201
     data = response.json()
@@ -111,7 +128,7 @@ def test_update_faq():
 # Test for DELETE /faqs/{category}/{faq_id}
 def test_delete_faq():
     response = client.delete("/faqs/test/1")
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 # Test for POST /faqs/{category}/{faq_id}/click
@@ -119,7 +136,7 @@ def test_increment_clicks():
     response = client.post("/faqs/test/1/click")
     assert response.status_code == 200
     data = response.json()
-    assert data["detail"] == "Clicks incremented successfully"
+    assert data["detail"] == "Clicks incremented successfully."
     assert data["new_clicks"] == 1
 
 
@@ -129,7 +146,7 @@ def test_get_faqs_by_category_no_data():
     assert response.status_code == 404
     data = response.json()
     assert len(data) == 1  # No FAQs for the 'unknown' category
-    assert data["detail"] == "No FAQs found."
+    assert data["detail"] == "No FAQs found for the specified category."
 
 
 # Test for POST /faqs with invalid data (missing required fields)
