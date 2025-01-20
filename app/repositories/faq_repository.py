@@ -1,7 +1,7 @@
 from azure.data.tables import TableServiceClient, TableEntity, UpdateMode
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError, AzureError, ServiceRequestError
 from models.faq_models import FAQEntry, FAQUpdate
-from fastapi import HTTPException
+from errors import DatabaseError
 import uuid
 import os
 import logging
@@ -20,8 +20,14 @@ class FAQRepository:
         self.table_client = self.table_service.create_table_if_not_exists(TABLE_NAME)
 
     def create_faq_entry(self, faq: FAQEntry):
+        """
+        Creates a new FAQ entry in Azure Table Storage.
+        Returns the row_key and the FAQ entry.
+        """
         partition_key = faq.category
-        row_key = str(uuid.uuid4())
+        row_key = str(uuid.uuid4())  # Unique identifier for the entry
+
+        # Prepare entity for Table Storage
         faq_entity: TableEntity = {
             "PartitionKey": partition_key,
             "RowKey": row_key,
@@ -29,25 +35,58 @@ class FAQRepository:
             "Answer": faq.answer,
             "Clicks": 0,
         }
-        self.table_client.create_entity(entity=faq_entity)
-        return {
-            "message": "FAQ entry created successfully",
-            "data": {**faq.dict(), "id": row_key},
-        }
+
+        try:
+            # Insert the entity into Table Storage
+            self.table_client.create_entity(entity=faq_entity)
+            return row_key, faq_entity
+
+        except ResourceExistsError:
+            raise DatabaseError("FAQ entry already exists")
+
+        except Exception as e:
+            raise Exception(f"Failed to create FAQ entry: {str(e)}")
 
     def get_faqs_by_category(self, category: Optional[str] = None):
-        query_filter = f"PartitionKey eq '{category}'" if category else ""
-        entities = self.table_client.query_entities(query_filter)
-        return [
-            FAQEntry(
-                question=entity["Question"],
-                answer=entity["Answer"],
-                category=entity["PartitionKey"],
-                id=entity["RowKey"],
-                clicks=entity["Clicks"],
+        """
+        Retrieves FAQs from Azure Table Storage by category.
+        Logs the process and handles any exceptions.
+        """
+        try:
+            self.logger.info(
+                f"Fetching FAQs for category: {'all' if category is None else category}"
             )
-            for entity in entities
-        ]
+
+            query_filter = f"PartitionKey eq '{category}'" if category else ""
+            entities = self.table_client.query_entities(query_filter)
+
+            return [
+                FAQEntry(
+                    question=entity["Question"],
+                    answer=entity["Answer"],
+                    category=entity["PartitionKey"],
+                    id=entity["RowKey"],
+                    clicks=entity["Clicks"],
+                )
+                for entity in entities
+            ]
+
+        except AzureError as e:
+            self.logger.error(
+                f"Error fetching FAQs from Azure Table Storage: {str(e)}", exc_info=True
+            )
+            raise DatabaseError("Error while fetching data from Azure Table Storage.")
+        
+        except ServiceRequestError as e:
+            self.logger.error(
+                f"Error fetching FAQs from Azure Table Storage: {str(e)}", exc_info=True
+            )
+            raise DatabaseError("Error while fetching data from Azure Table Storage. No connection could be made. Try again in a moment.")
+
+        except Exception as e:
+            # General exception catch for other unforeseen issues
+            self.logger.error(f"Failed to fetch FAQs: {str(e)}", exc_info=True)
+            raise Exception("An unexpected error occurred while fetching FAQs.")
 
     def get_faq_by_id(self, category: str, faq_id: str):
         try:
@@ -61,8 +100,9 @@ class FAQRepository:
                 id=entity["RowKey"],
                 clicks=entity["Clicks"],
             )
+
         except ResourceNotFoundError:
-            raise HTTPException(status_code=404, detail="FAQ not found.")
+            raise ResourceNotFoundError(status_code=404, detail="FAQ not found.")
 
     def update_faq(self, category: str, faq_id: str, faq: FAQUpdate):
         """
@@ -126,10 +166,17 @@ class FAQRepository:
                 )
 
         except ResourceNotFoundError:
-            raise HTTPException(status_code=404, detail="FAQ not found.")
-
-        except Exception:
-            raise HTTPException(status_code=500, detail="Internal Server Error.")
+            raise ResourceNotFoundError("FAQ entry not found.")
+        except AzureError as e:
+            # Log and raise a more general exception for Azure-related errors
+            self.logger.error(f"Error updating FAQ: {str(e)}", exc_info=True)
+            raise DatabaseError("Error updating the FAQ entry in Azure Table Storage.")
+        except Exception as e:
+            # Catch any unforeseen errors
+            self.logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+            raise Exception(
+                "An unexpected error occurred while updating the FAQ entry."
+            )
 
     def delete_faq(self, category: str, faq_id: str):
         """
@@ -162,10 +209,17 @@ class FAQRepository:
             }
 
     def increment_clicks(self, category: str, faq_id: str):
+        """
+        Increments the click count for a specific FAQ entry in Azure Table Storage.
+        Returns the updated click count.
+        """
+        # Try block for direct database interaction
         entity = self.table_client.get_entity(partition_key=category, row_key=faq_id)
+
+        # Increment the 'Clicks' field, defaulting to 0 if not found
         entity["Clicks"] = entity.get("Clicks", 0) + 1
+
+        # Update the entity in Table Storage
         self.table_client.update_entity(entity, mode=UpdateMode.REPLACE)
-        return {
-            "detail": "Clicks incremented successfully.",
-            "new_clicks": entity["Clicks"],
-        }
+
+        return entity["Clicks"]
