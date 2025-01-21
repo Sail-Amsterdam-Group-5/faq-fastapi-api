@@ -14,6 +14,7 @@ app = FastAPI()
 azure_logger = logging.getLogger("azure")
 azure_logger.setLevel(logging.WARNING)  # Log only warnings or above
 
+# creates logger
 logging.config.fileConfig("app/logging_config.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 
