@@ -61,6 +61,7 @@ jobs:
         run: pytest || echo "No tests available, skipping."
 
   deploy:
+      needs: [linting, test]
       runs-on: ubuntu-latest
 
       steps:
