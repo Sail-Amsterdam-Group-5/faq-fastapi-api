@@ -3,19 +3,11 @@ name: Development CI
 on:
   push:
     branches:
-      - 'features/**'
       - dev
     paths:
       - '**.py'
       - 'requirements.txt'
       - 'deployment.yml'
-  pull_request:
-    branches:
-      - 'features/**'
-    types:
-      - opened
-      - reopened
-      - synchronize
 
 jobs:
   linting:
